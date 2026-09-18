@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isUserInRole(role) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // ==========================================
+    // USERS COLLECTION
+    // ==========================================
+    match /users/{userId} {
+      // Users can read/write only their own document
+      allow read, update, delete: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // User Favorites subcollection
+      match /favorites/{photographerId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User FCM Tokens subcollection
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isAuthenticated();
+      }
+    }
+
+    // ==========================================
+    // PHOTOGRAPHERS COLLECTION
+    // ==========================================
+    match /photographers/{photographerId} {
+      // Anyone can read public photographer profiles
+      allow read: if true;
+      
+      // Photographers can only create/update their own profile
+      allow create: if isAuthenticated() && request.auth.uid == photographerId;
+      allow update, delete: if isOwner(photographerId);
+    }
+
+    // ==========================================
+    // PORTFOLIOS COLLECTION
+    // ==========================================
+    match /portfolios/{portfolioId} {
+      // Anyone can view portfolio items
+      allow read: if true;
+      
+      // Photographers can only create/update/delete portfolio items belonging to them
+      allow create: if isAuthenticated() && request.resource.data.photographerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.photographerId == request.auth.uid;
+    }
+
+    // ==========================================
+    // BOOKINGS COLLECTION
+    // ==========================================
+    match /bookings/{bookingId} {
+      // Customer and assigned photographer can read the booking
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.photographerId == request.auth.uid
+      );
+      
+      // Customers can create bookings for themselves with pending/unpaid initial state
+      allow create: if isAuthenticated() && 
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.status == 'Pending' &&
+        request.resource.data.paymentStatus == 'unpaid';
+      
+      // Status updates: strictly validated transitions
+      allow update: if isAuthenticated() && (
+        // Customer can only cancel their own pending booking
+        (resource.data.customerId == request.auth.uid &&
+         request.resource.data.status == 'Cancelled' &&
+         resource.data.status == 'Pending') ||
+        
+        // Photographer can accept, reject, or cancel their bookings
+        (resource.data.photographerId == request.auth.uid && (
+          (request.resource.data.status == 'Accepted' && resource.data.status == 'Pending') ||
+          (request.resource.data.status == 'Rejected' && resource.data.status == 'Pending') ||
+          (request.resource.data.status == 'Cancelled' && resource.data.status == 'Accepted') ||
+          (request.resource.data.status == 'Completed' && resource.data.status == 'Accepted')
+        ))
+      );
+      
+      allow delete: if false; // Bookings must not be arbitrarily deleted
+    }
+
+    // ==========================================
+    // AVAILABILITY COLLECTION
+    // ==========================================
+    match /availability/{availabilityId} {
+      // Anyone can read available slot times
+      allow read: if true;
+      
+      // Photographers can manage only their own availability
+      allow create: if isAuthenticated() && request.resource.data.photographerId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.photographerId == request.auth.uid;
+    }
+
+    // ==========================================
+    // PAYMENTS COLLECTION (Admin / Backend Only)
+    // ==========================================
+    match /payments/{paymentId} {
+      // Customers and photographers can only read payment receipts related to them
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.photographerId == request.auth.uid
+      );
+      // Client code cannot write directly to payments collection; handled via trusted Cloud Functions
+      allow write: if false;
+    }
+
+    // ==========================================
+    // CONVERSATIONS & CHAT
+    // ==========================================
+    match /conversations/{conversationId} {
+      allow read, update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.photographerId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.customerId == request.auth.uid ||
+        request.resource.data.photographerId == request.auth.uid
+      );
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid ||
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.photographerId == request.auth.uid
+        );
+        allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+      }
+    }
+  }
+}
+

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "951546987988",
+    "project_id": "pyp-app-fc631",
+    "storage_bucket": "pyp-app-fc631.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951546987988:android:52298f504df561a81f8241",
+        "android_client_info": {
+          "package_name": "com.example.pyp_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "951546987988-o9u04i34h76mm86ef6scmag4m75f1kj2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCq_UibliO1Q_5Bp9vFzxZqcAv2bAJ-kro"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "951546987988-o9u04i34h76mm86ef6scmag4m75f1kj2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

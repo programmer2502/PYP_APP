@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isUnderMaxSize(maxMegabytes) {
+      return request.resource.size < maxMegabytes * 1024 * 1024;
+    }
+
+    // Profile Images: users can manage their own avatar
+    match /profile_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+                      request.auth.uid == userId && 
+                      isImage() && 
+                      isUnderMaxSize(5); // 5MB max
+    }
+
+    // Portfolio Images: photographers can manage their own portfolio assets
+    match /portfolio/{photographerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthenticated() && 
+                      request.auth.uid == photographerId && 
+                      isImage() && 
+                      isUnderMaxSize(10); // 10MB max
+      allow delete: if isAuthenticated() && request.auth.uid == photographerId;
+    }
+  }
+}
