@@ -54,6 +54,23 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _loginWithGoogle() async {
+    final success = await widget.authProvider.loginWithGoogle();
+    if (mounted) {
+      if (success) {
+        widget.onLoginSuccess();
+      } else if (widget.authProvider.errorMessage != null &&
+          !widget.authProvider.errorMessage!.contains('cancelled')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.authProvider.errorMessage!),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,6 +154,77 @@ class _LoginScreenState extends State<LoginScreen> {
                       title: 'Sign In',
                       isLoading: widget.authProvider.isLoading,
                       onPressed: _login,
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.borderLight)),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: AppColors.borderLight)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                AnimatedBuilder(
+                  animation: widget.authProvider,
+                  builder: (context, _) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: OutlinedButton(
+                        onPressed: widget.authProvider.isLoading
+                            ? null
+                            : _loginWithGoogle,
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: AppColors.card,
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: AppColors.borderLight),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Color(0xFF4285F4),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Continue with Google',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),

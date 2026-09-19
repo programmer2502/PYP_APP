@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/pyp_store.dart';
 import '../../widgets/common/form_screen_scaffold.dart';
 import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/pyp_location_dropdown.dart';
 import '../../widgets/common/pyp_text_field.dart';
 
 class PhotographerOnboardingScreen extends StatefulWidget {
@@ -28,20 +29,27 @@ class _PhotographerOnboardingScreenState
   final nameController = TextEditingController();
   final specialtyController = TextEditingController();
   final priceController = TextEditingController();
-  final locationController = TextEditingController();
   final bioController = TextEditingController();
   final phoneController = TextEditingController();
   final emailController = TextEditingController();
   final instagramController = TextEditingController();
 
   String category = 'Weddings';
+  late String location;
+
+  @override
+  void initState() {
+    super.initState();
+    location = widget.store.user.city.isNotEmpty
+        ? widget.store.user.city
+        : widget.store.currentCity;
+  }
 
   @override
   void dispose() {
     nameController.dispose();
     specialtyController.dispose();
     priceController.dispose();
-    locationController.dispose();
     bioController.dispose();
     phoneController.dispose();
     emailController.dispose();
@@ -57,7 +65,7 @@ class _PhotographerOnboardingScreenState
       category: category,
       specialty: specialtyController.text.trim(),
       price: priceController.text.trim(),
-      location: locationController.text.trim(),
+      location: location.trim(),
       bio: bioController.text.trim(),
       phone: phoneController.text.trim(),
       email: emailController.text.trim(),
@@ -75,6 +83,10 @@ class _PhotographerOnboardingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final joiningCity = widget.store.user.city.isNotEmpty
+        ? widget.store.user.city
+        : widget.store.currentCity;
+
     return FormScreenScaffold(
       title: 'Photographer account',
       children: [
@@ -155,12 +167,15 @@ class _PhotographerOnboardingScreenState
                 hint: '₹8,000 onwards',
                 requiredField: true,
               ),
-              PypTextField(
-                controller: locationController,
+              PypLocationDropdown(
+                value: location,
+                detectedJoiningCity: joiningCity,
                 label: 'Location',
-                icon: Icons.location_on_outlined,
-                hint: 'Bengaluru',
-                requiredField: true,
+                onChanged: (val) {
+                  setState(() {
+                    location = val;
+                  });
+                },
               ),
               PypTextField(
                 controller: bioController,

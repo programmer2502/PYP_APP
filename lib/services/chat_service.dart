@@ -10,25 +10,41 @@ class ChatService {
   ChatService({FirestoreService? firestoreService})
       : _firestoreService = firestoreService ?? FirestoreService();
 
-  Stream<List<ConversationModel>> streamConversations(String userId) {
-    if (!_firestoreService.isReady) {
+  Stream<List<ConversationModel>> streamConversations(List<String> userIdentifiers) {
+    if (!_firestoreService.isReady || userIdentifiers.isEmpty) {
+      return Stream.value([]);
+    }
+
+    final cleanIdentifiers = userIdentifiers
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty && s != 'user@example.com' && s != 'PYP User')
+        .toSet()
+        .toList();
+
+    if (cleanIdentifiers.isEmpty) {
       return Stream.value([]);
     }
 
     return _firestoreService
         .collection(FirestoreCollections.conversations)
-        .where(Filter.or(
-          Filter('customerId', isEqualTo: userId),
-          Filter('photographerId', isEqualTo: userId),
-        ))
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ConversationModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ConversationModel.fromMap(doc.data(), doc.id))
+              .where((convo) => convo.matchesUser(cleanIdentifiers))
+              .toList();
+
+          list.sort((a, b) {
+            final aTime = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
+          return list;
+        });
   }
 
   Stream<List<ChatMessageModel>> streamMessages(String conversationId) {
-    if (!_firestoreService.isReady) {
+    if (!_firestoreService.isReady || conversationId.isEmpty) {
       return Stream.value([]);
     }
 
@@ -36,17 +52,34 @@ class ChatService {
         .collection(FirestoreCollections.conversations)
         .doc(conversationId)
         .collection(FirestoreCollections.messages)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ChatMessageModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final list = snapshot.docs
+              .map((doc) => ChatMessageModel.fromMap(doc.data(), doc.id))
+              .toList();
+
+          list.sort((a, b) {
+            final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bTime.compareTo(aTime);
+          });
+
+          return list;
+        });
   }
 
   Future<void> sendMessage({
     required String conversationId,
     required String senderId,
     required String message,
+    String senderName = '',
+    String? recipientId,
+    String? recipientName,
+    String? customerName,
+    String? photographerName,
+    String? customerId,
+    String? photographerId,
+    List<String>? additionalParticipants,
     String type = 'text',
   }) async {
     if (!_firestoreService.isReady) return;
@@ -55,6 +88,7 @@ class ChatService {
       final msg = ChatMessageModel(
         id: '',
         senderId: senderId,
+        senderName: senderName,
         message: message,
         type: type,
         createdAt: DateTime.now(),
@@ -67,10 +101,44 @@ class ChatService {
       final batch = _firestoreService.batch();
       final msgRef = convoRef.collection(FirestoreCollections.messages).doc();
       batch.set(msgRef, msg.toMap());
-      batch.update(convoRef, {
+
+      final allParts = <String>{
+        senderId,
+        if (senderName.isNotEmpty) senderName,
+        if (recipientId != null && recipientId.isNotEmpty) recipientId,
+        if (recipientName != null && recipientName.isNotEmpty) recipientName,
+        if (customerId != null && customerId.isNotEmpty) customerId,
+        if (photographerId != null && photographerId.isNotEmpty) photographerId,
+        if (customerName != null && customerName.isNotEmpty) customerName,
+        if (photographerName != null && photographerName.isNotEmpty) photographerName,
+        ...?additionalParticipants,
+      }.where((s) => s.trim().isNotEmpty && s != 'user@example.com' && s != 'PYP User').toList();
+
+      final updateMap = <String, dynamic>{
+        'conversationId': conversationId,
         'lastMessage': message,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+        'participants': FieldValue.arrayUnion(allParts),
+      };
+
+      if (customerId != null && customerId.isNotEmpty) {
+        updateMap['customerId'] = customerId;
+      }
+      if (photographerId != null && photographerId.isNotEmpty) {
+        updateMap['photographerId'] = photographerId;
+      }
+      if (customerName != null && customerName.isNotEmpty) {
+        updateMap['customerName'] = customerName;
+      }
+      if (photographerName != null && photographerName.isNotEmpty) {
+        updateMap['photographerName'] = photographerName;
+      }
+
+      batch.set(
+        convoRef,
+        updateMap,
+        SetOptions(merge: true),
+      );
 
       await batch.commit();
     } catch (e) {
@@ -81,39 +149,64 @@ class ChatService {
   Future<String> getOrCreateConversation({
     required String customerId,
     required String photographerId,
+    String customerName = '',
+    String photographerName = '',
+    String? customerPhoto,
+    String? photographerPhoto,
+    List<String>? allParticipants,
   }) async {
+    final safeCust = customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    final safePhoto = photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    final deterministicId = 'convo_${safeCust}_$safePhoto';
+
     if (!_firestoreService.isReady) {
-      return '${customerId}_$photographerId';
+      return deterministicId;
     }
 
     try {
-      final existing = await _firestoreService
+      final convoRef = _firestoreService
           .collection(FirestoreCollections.conversations)
-          .where('customerId', isEqualTo: customerId)
-          .where('photographerId', isEqualTo: photographerId)
-          .limit(1)
-          .get();
+          .doc(deterministicId);
 
-      if (existing.docs.isNotEmpty) {
-        return existing.docs.first.id;
+      final doc = await convoRef.get();
+      final participantsList = <String>{
+        customerId,
+        photographerId,
+        if (customerName.isNotEmpty) customerName,
+        if (photographerName.isNotEmpty) photographerName,
+        ...?allParticipants,
+      }.where((s) => s.trim().isNotEmpty && s != 'user@example.com' && s != 'PYP User').toList();
+
+      if (doc.exists) {
+        await convoRef.set({
+          'participants': FieldValue.arrayUnion(participantsList),
+          if (customerName.isNotEmpty) 'customerName': customerName,
+          if (photographerName.isNotEmpty) 'photographerName': photographerName,
+          'customerPhoto': ?customerPhoto,
+          'photographerPhoto': ?photographerPhoto,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        return doc.id;
       }
 
       final newConvo = ConversationModel(
-        id: '',
+        id: deterministicId,
         customerId: customerId,
         photographerId: photographerId,
+        customerName: customerName,
+        photographerName: photographerName,
+        customerPhoto: customerPhoto,
+        photographerPhoto: photographerPhoto,
+        participants: participantsList,
         lastMessage: 'Conversation started',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
-      final docRef = await _firestoreService
-          .collection(FirestoreCollections.conversations)
-          .add(newConvo.toMap());
-
-      return docRef.id;
+      await convoRef.set(newConvo.toMap(), SetOptions(merge: true));
+      return deterministicId;
     } catch (e) {
-      throw FirestoreException('Failed to get or create conversation: $e');
+      return deterministicId;
     }
   }
 }

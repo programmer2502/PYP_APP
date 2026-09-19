@@ -4,6 +4,8 @@ import '../../providers/pyp_store.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/photographer/photographer_request_card.dart';
 
+import '../chat/chat_room_screen.dart';
+
 class PhotographerRequests extends StatelessWidget {
   final PypStore store;
 
@@ -61,6 +63,40 @@ class PhotographerRequests extends StatelessWidget {
                             store.updateBookingStatus(booking, 'Rejected');
                           }
                         : null,
+                    onMessage: () {
+                      final identifiers = store.currentUserChatIdentifiers;
+                      final currentUserId = identifiers.first;
+                      final clientAlias = booking.customerId.isNotEmpty
+                          ? booking.customerId
+                          : (booking.customerEmail.isNotEmpty
+                              ? booking.customerEmail
+                              : 'customer');
+                      final photoId = booking.photographerId.isNotEmpty
+                          ? booking.photographerId
+                          : booking.photographerName;
+
+                      final safeCust = clientAlias.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+                      final safePhoto = photoId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+                      final convoId = 'convo_${safeCust}_$safePhoto';
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatRoomScreen(
+                            conversationId: convoId,
+                            recipientName: booking.customerName.isNotEmpty
+                                ? booking.customerName
+                                : (booking.customerEmail.isNotEmpty
+                                    ? booking.customerEmail
+                                    : 'Client'),
+                            recipientId: clientAlias,
+                            currentUserId: currentUserId,
+                            chatProvider: store.chatProvider,
+                            store: store,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

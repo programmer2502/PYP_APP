@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/pyp_store.dart';
 import '../../widgets/common/form_screen_scaffold.dart';
 import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/pyp_location_dropdown.dart';
 import '../../widgets/common/pyp_text_field.dart';
 
 class PhotographerEditProfile extends StatefulWidget {
@@ -22,27 +23,27 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
   late final TextEditingController nameController;
   late final TextEditingController specialtyController;
   late final TextEditingController priceController;
-  late final TextEditingController locationController;
   late final TextEditingController bioController;
   late final TextEditingController phoneController;
   late final TextEditingController emailController;
   late final TextEditingController instagramController;
 
+  late String location;
   late String category;
 
   @override
   void initState() {
     super.initState();
-    final account = widget.store.photographerAccount!;
-    nameController = TextEditingController(text: account.name);
-    specialtyController = TextEditingController(text: account.specialty);
-    priceController = TextEditingController(text: account.price);
-    locationController = TextEditingController(text: account.location);
-    bioController = TextEditingController(text: account.bio);
-    phoneController = TextEditingController(text: account.phone);
-    emailController = TextEditingController(text: account.email);
-    instagramController = TextEditingController(text: account.instagram);
-    category = account.category;
+    final account = widget.store.photographerAccount;
+    nameController = TextEditingController(text: account?.name ?? widget.store.user.name);
+    specialtyController = TextEditingController(text: account?.specialty ?? 'Photography & Media');
+    priceController = TextEditingController(text: account?.price ?? '₹5,000 onwards');
+    location = account?.location ?? (widget.store.user.city.isNotEmpty ? widget.store.user.city : widget.store.currentCity);
+    bioController = TextEditingController(text: account?.bio ?? '');
+    phoneController = TextEditingController(text: account?.phone ?? widget.store.user.phone);
+    emailController = TextEditingController(text: account?.email ?? widget.store.user.email);
+    instagramController = TextEditingController(text: account?.instagram ?? '');
+    category = account?.category ?? 'Weddings';
   }
 
   @override
@@ -50,7 +51,6 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
     nameController.dispose();
     specialtyController.dispose();
     priceController.dispose();
-    locationController.dispose();
     bioController.dispose();
     phoneController.dispose();
     emailController.dispose();
@@ -64,7 +64,7 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
       category: category,
       specialty: specialtyController.text.trim(),
       price: priceController.text.trim(),
-      location: locationController.text.trim(),
+      location: location.trim(),
       bio: bioController.text.trim(),
       phone: phoneController.text.trim(),
       email: emailController.text.trim(),
@@ -79,6 +79,10 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
 
   @override
   Widget build(BuildContext context) {
+    final joiningCity = widget.store.user.city.isNotEmpty
+        ? widget.store.user.city
+        : widget.store.currentCity;
+
     return FormScreenScaffold(
       title: 'Edit profile',
       children: [
@@ -133,10 +137,15 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
           label: 'Starting price',
           icon: Icons.currency_rupee_rounded,
         ),
-        PypTextField(
-          controller: locationController,
+        PypLocationDropdown(
+          value: location,
+          detectedJoiningCity: joiningCity,
           label: 'Location',
-          icon: Icons.location_on_outlined,
+          onChanged: (val) {
+            setState(() {
+              location = val;
+            });
+          },
         ),
         PypTextField(
           controller: bioController,

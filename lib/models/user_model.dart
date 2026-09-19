@@ -94,6 +94,7 @@ class UserModel {
 
 // Backward compatible UserProfile class for in-memory store compatibility
 class UserProfile {
+  String uid;
   String name;
   String email;
   String phone;
@@ -101,6 +102,7 @@ class UserProfile {
   String? profileImageUrl;
 
   UserProfile({
+    this.uid = '',
     this.name = 'PYP User',
     this.email = 'user@example.com',
     this.phone = '',
@@ -108,9 +110,10 @@ class UserProfile {
     this.profileImageUrl,
   });
 
-  UserModel toUserModel(String uid) {
+  UserModel toUserModel([String? explicitUid]) {
+    final finalUid = (explicitUid != null && explicitUid.isNotEmpty) ? explicitUid : uid;
     return UserModel(
-      uid: uid,
+      uid: finalUid,
       name: name,
       email: email,
       phone: phone,

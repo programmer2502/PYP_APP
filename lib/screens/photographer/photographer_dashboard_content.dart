@@ -3,7 +3,10 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/pyp_store.dart';
 import '../../widgets/common/stat_card.dart';
 import '../../widgets/photographer/quick_action_card.dart';
+import '../../widgets/common/empty_state.dart';
+import '../../widgets/common/primary_button.dart';
 import 'photographer_edit_profile_screen.dart';
+import 'photographer_onboarding_screen.dart';
 import 'portfolio_manager_screen.dart';
 
 class PhotographerDashboard extends StatelessWidget {
@@ -16,23 +19,62 @@ class PhotographerDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final account = store.photographerAccount;
-    if (account == null) {
-      return const SizedBox.shrink();
-    }
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final account = store.photographerAccount;
+        if (account == null) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const EmptyState(
+                    icon: Icons.camera_alt_outlined,
+                    title: 'Welcome to Photographer Mode',
+                    subtitle: 'Create your profile to start receiving customer shoot requests and bookings.',
+                  ),
+                  const SizedBox(height: 24),
+                  PrimaryButton(
+                    title: 'Set up Photographer Profile',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PhotographerOnboardingScreen(
+                            store: store,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: store.switchToCustomer,
+                    child: const Text(
+                      'Return to Customer Home',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
-    final requests = store.photographerRequests;
-    final pending =
-        requests.where((booking) => booking.status == 'Pending').length;
-    final accepted =
-        requests.where((booking) => booking.status == 'Accepted').length;
+        final requests = store.photographerRequests;
+        final pending =
+            requests.where((booking) => booking.status == 'Pending').length;
+        final accepted =
+            requests.where((booking) => booking.status == 'Accepted').length;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -194,6 +236,8 @@ class PhotographerDashboard extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

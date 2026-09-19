@@ -10,32 +10,76 @@ class BookingService {
   BookingService({FirestoreService? firestoreService})
       : _firestoreService = firestoreService ?? FirestoreService();
 
-  Stream<List<BookingModel>> streamCustomerBookings(String customerId) {
+  Stream<List<BookingModel>> streamCustomerBookings(dynamic identifiers) {
     if (!_firestoreService.isReady) {
       return Stream.value([]);
     }
 
+    final List<String> cleanIds = identifiers is List<String>
+        ? identifiers
+        : (identifiers is String ? [identifiers] : <String>[]);
+
     return _firestoreService
         .collection(FirestoreCollections.bookings)
-        .where('customerId', isEqualTo: customerId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => BookingModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final allBookings = snapshot.docs
+              .map((doc) => BookingModel.fromMap(doc.data(), doc.id))
+              .toList();
+
+          if (cleanIds.isEmpty) {
+            return allBookings;
+          }
+
+          final list = allBookings
+              .where((booking) => booking.matchesCustomer(cleanIds))
+              .toList();
+
+          final result = list.isNotEmpty ? list : allBookings;
+
+          result.sort((a, b) {
+            final aTime = a.createdAt ?? a.date;
+            final bTime = b.createdAt ?? b.date;
+            return bTime.compareTo(aTime);
+          });
+
+          return result;
+        });
   }
 
-  Stream<List<BookingModel>> streamPhotographerRequests(String photographerId) {
+  Stream<List<BookingModel>> streamPhotographerRequests(dynamic identifiers) {
     if (!_firestoreService.isReady) {
       return Stream.value([]);
     }
 
+    final List<String> cleanIds = identifiers is List<String>
+        ? identifiers
+        : (identifiers is String ? [identifiers] : <String>[]);
+
     return _firestoreService
         .collection(FirestoreCollections.bookings)
-        .where('photographerId', isEqualTo: photographerId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => BookingModel.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+          final allBookings = snapshot.docs
+              .map((doc) => BookingModel.fromMap(doc.data(), doc.id))
+              .toList();
+
+          if (cleanIds.isEmpty) {
+            return allBookings;
+          }
+
+          final list = allBookings
+              .where((booking) => booking.matchesPhotographer(cleanIds))
+              .toList();
+
+          list.sort((a, b) {
+            final aTime = a.createdAt ?? a.date;
+            final bTime = b.createdAt ?? b.date;
+            return bTime.compareTo(aTime);
+          });
+
+          return list;
+        });
   }
 
   Future<String> createBooking(BookingModel booking) async {
@@ -103,6 +147,35 @@ class BookingService {
       });
     } catch (e) {
       throw FirestoreException('Failed to update booking status: $e');
+    }
+  }
+
+  Future<void> updateBookingPayment({
+    required String bookingId,
+    required PaymentStatus paymentStatus,
+    String? paymentId,
+    String? orderId,
+  }) async {
+    if (!_firestoreService.isReady) return;
+
+    try {
+      final data = <String, dynamic>{
+        'paymentStatus': paymentStatus.value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (paymentId != null && paymentId.isNotEmpty) {
+        data['razorpayPaymentId'] = paymentId;
+      }
+      if (orderId != null && orderId.isNotEmpty) {
+        data['razorpayOrderId'] = orderId;
+      }
+
+      await _firestoreService
+          .collection(FirestoreCollections.bookings)
+          .doc(bookingId)
+          .update(data);
+    } catch (e) {
+      throw FirestoreException('Failed to update booking payment: $e');
     }
   }
 }

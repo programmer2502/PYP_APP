@@ -31,11 +31,33 @@ class AuthProvider extends ChangeNotifier {
     _authService.authStateChanges.listen((user) async {
       _firebaseUser = user;
       if (user != null) {
-        _userModel = await _userRepository.getUser(user.uid);
+        // Immediate baseline model from Firebase User
+        _userModel = UserModel(
+          uid: user.uid,
+          name: user.displayName?.isNotEmpty == true
+              ? user.displayName!
+              : (user.email?.split('@').first ?? 'PYP User'),
+          email: user.email ?? '',
+          phone: user.phoneNumber ?? '',
+          role: UserRole.customer,
+          profileImageUrl: user.photoURL,
+          createdAt: DateTime.now(),
+        );
+        notifyListeners();
+
+        try {
+          final fetched = await _userRepository.getUser(user.uid);
+          if (fetched != null) {
+            _userModel = fetched;
+            notifyListeners();
+          } else if (_userModel != null) {
+            _userRepository.createOrUpdateUser(_userModel!).catchError((_) {});
+          }
+        } catch (_) {}
       } else {
         _userModel = null;
+        notifyListeners();
       }
-      notifyListeners();
     });
   }
 
@@ -68,6 +90,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String name,
     required UserRole role,
+    String city = 'Bengaluru',
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -86,6 +109,7 @@ class AuthProvider extends ChangeNotifier {
           uid: credential.user!.uid,
           name: name,
           email: email,
+          city: city,
           role: role,
           createdAt: DateTime.now(),
         );
@@ -97,7 +121,46 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceFirst('Exception: ', '').replaceFirst('AuthException: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> loginWithGoogle({UserRole role = UserRole.customer}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final credential = await _authService.signInWithGoogle();
+      if (credential.user != null) {
+        final user = credential.user!;
+        final existingUser = await _userRepository.getUser(user.uid);
+        if (existingUser == null) {
+          final newUser = UserModel(
+            uid: user.uid,
+            name: user.displayName?.isNotEmpty == true
+                ? user.displayName!
+                : (user.email?.split('@').first ?? 'PYP User'),
+            email: user.email ?? '',
+            phone: user.phoneNumber ?? '',
+            role: role,
+            profileImageUrl: user.photoURL,
+            createdAt: DateTime.now(),
+          );
+          await _userRepository.createOrUpdateUser(newUser);
+          _userModel = newUser;
+        } else {
+          _userModel = existingUser;
+        }
+      }
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '').replaceFirst('AuthException: ', '');
       _isLoading = false;
       notifyListeners();
       return false;

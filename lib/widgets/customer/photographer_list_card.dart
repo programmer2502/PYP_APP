@@ -16,6 +16,9 @@ class PhotographerListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final images = photographer.displayImages;
+    final thumbnail = images.isNotEmpty ? images.first : null;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -47,11 +50,26 @@ class PhotographerListCard extends StatelessWidget {
                 color: AppColors.mediaPlaceholder,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                color: Colors.white24,
-                size: 34,
-              ),
+              clipBehavior: Clip.antiAlias,
+              child: thumbnail != null
+                  ? Image.network(
+                      thumbnail,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Center(
+                        child: Icon(
+                          Icons.camera_alt_rounded,
+                          color: Colors.white24,
+                          size: 34,
+                        ),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color: Colors.white24,
+                        size: 34,
+                      ),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -72,16 +90,46 @@ class PhotographerListCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (photographer.verified)
+                      if (photographer.verified) ...[
+                        const SizedBox(width: 4),
                         const Icon(
                           Icons.verified_rounded,
                           size: 15,
+                          color: Color(0xFF38BDF8),
                         ),
+                      ],
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (photographer.isVideographer)
+                              ? const Color(0xFF818CF8).withValues(alpha: 0.2)
+                              : const Color(0xFFFBBF24).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          photographer.serviceType == 'Both'
+                              ? 'Photo+Video'
+                              : (photographer.isVideographer ? 'Video' : 'Photo'),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: (photographer.isVideographer)
+                                ? const Color(0xFF818CF8)
+                                : const Color(0xFFFBBF24),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
                   Text(
                     photographer.specialty,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textFaint,
@@ -93,6 +141,7 @@ class PhotographerListCard extends StatelessWidget {
                       const Icon(
                         Icons.star_rounded,
                         size: 14,
+                        color: Color(0xFFFFC107),
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -103,11 +152,15 @@ class PhotographerListCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        photographer.location,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textMuted,
+                      Expanded(
+                        child: Text(
+                          photographer.location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ),
                     ],
@@ -118,6 +171,7 @@ class PhotographerListCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -125,15 +179,15 @@ class PhotographerListCard extends StatelessWidget {
             ),
             IconButton(
               onPressed: () {
-                store.savePhotographer(photographer.name);
+                store.savePhotographer(photographer.id.isNotEmpty ? photographer.id : photographer.name);
               },
               icon: Icon(
-                store.isSaved(photographer.name)
+                store.isPhotographerSaved(photographer)
                     ? Icons.favorite_rounded
                     : Icons.favorite_border_rounded,
                 size: 20,
-                color: store.isSaved(photographer.name)
-                    ? Colors.white
+                color: store.isPhotographerSaved(photographer)
+                    ? Colors.redAccent
                     : AppColors.textMuted,
               ),
             ),

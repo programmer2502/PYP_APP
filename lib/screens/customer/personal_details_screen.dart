@@ -5,6 +5,7 @@ import '../../providers/pyp_store.dart';
 import '../../repositories/user_repository.dart';
 import '../../widgets/common/form_screen_scaffold.dart';
 import '../../widgets/common/primary_button.dart';
+import '../../widgets/common/pyp_location_dropdown.dart';
 import '../../widgets/common/pyp_text_field.dart';
 
 class PersonalDetailsScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
   late final TextEditingController nameController;
   late final TextEditingController emailController;
   late final TextEditingController phoneController;
-  late final TextEditingController cityController;
+  late String city;
   bool _saving = false;
 
   @override
@@ -34,7 +35,9 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     nameController = TextEditingController(text: widget.store.user.name);
     emailController = TextEditingController(text: widget.store.user.email);
     phoneController = TextEditingController(text: widget.store.user.phone);
-    cityController = TextEditingController(text: widget.store.user.city);
+    city = widget.store.user.city.isNotEmpty
+        ? widget.store.user.city
+        : widget.store.currentCity;
   }
 
   @override
@@ -42,7 +45,6 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
     nameController.dispose();
     emailController.dispose();
     phoneController.dispose();
-    cityController.dispose();
     super.dispose();
   }
 
@@ -54,7 +56,6 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         ? 'user@example.com'
         : emailController.text.trim();
     final phone = phoneController.text.trim();
-    final city = cityController.text.trim();
 
     setState(() {
       _saving = true;
@@ -64,7 +65,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
       name: name,
       email: email,
       phone: phone,
-      city: city,
+      city: city.trim(),
     );
 
     // Sync to Firestore if authenticated user
@@ -77,7 +78,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
           name: name,
           email: email,
           phone: phone,
-          city: city,
+          city: city.trim(),
           role: widget.store.role,
           updatedAt: DateTime.now(),
         );
@@ -99,6 +100,10 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final joiningCity = widget.store.user.city.isNotEmpty
+        ? widget.store.user.city
+        : widget.store.currentCity;
+
     return FormScreenScaffold(
       title: 'Personal details',
       children: [
@@ -119,10 +124,15 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
         ),
-        PypTextField(
-          controller: cityController,
-          label: 'City',
-          icon: Icons.location_on_outlined,
+        PypLocationDropdown(
+          value: city,
+          detectedJoiningCity: joiningCity,
+          label: 'City / Location',
+          onChanged: (val) {
+            setState(() {
+              city = val;
+            });
+          },
         ),
         const SizedBox(height: 12),
         PrimaryButton(

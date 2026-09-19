@@ -1,6 +1,8 @@
 import 'dart:developer' as developer;
 import 'package:firebase_core/firebase_core.dart';
 
+import '../firebase_options.dart';
+
 class FirebaseService {
   FirebaseService._();
   static final FirebaseService instance = FirebaseService._();
@@ -17,7 +19,13 @@ class FirebaseService {
         return;
       }
 
-      await Firebase.initializeApp();
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (_) {
+        await Firebase.initializeApp();
+      }
       _isInitialized = true;
       developer.log('Firebase initialized successfully.', name: 'FirebaseService');
     } catch (e, stack) {

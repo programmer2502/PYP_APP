@@ -7,12 +7,12 @@ class BookingRepository {
   BookingRepository({BookingService? service})
       : _service = service ?? BookingService();
 
-  Stream<List<BookingModel>> getCustomerBookings(String customerId) {
-    return _service.streamCustomerBookings(customerId);
+  Stream<List<BookingModel>> getCustomerBookings(dynamic customerIdOrIdentifiers) {
+    return _service.streamCustomerBookings(customerIdOrIdentifiers);
   }
 
-  Stream<List<BookingModel>> getPhotographerRequests(String photographerId) {
-    return _service.streamPhotographerRequests(photographerId);
+  Stream<List<BookingModel>> getPhotographerRequests(dynamic photographerIdOrIdentifiers) {
+    return _service.streamPhotographerRequests(photographerIdOrIdentifiers);
   }
 
   Future<String> createBooking(BookingModel booking) {
@@ -28,6 +28,20 @@ class BookingRepository {
       bookingId: bookingId,
       currentStatus: currentStatus,
       newStatus: newStatus,
+    );
+  }
+
+  Future<void> updateBookingPayment({
+    required String bookingId,
+    required PaymentStatus paymentStatus,
+    String? paymentId,
+    String? orderId,
+  }) {
+    return _service.updateBookingPayment(
+      bookingId: bookingId,
+      paymentStatus: paymentStatus,
+      paymentId: paymentId,
+      orderId: orderId,
     );
   }
 }

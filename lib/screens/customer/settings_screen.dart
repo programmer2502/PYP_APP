@@ -24,35 +24,40 @@ class SettingsScreen extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
-        children: [
-          SettingSwitch(
-            title: 'Push notifications',
-            subtitle: 'Booking and account updates',
-            value: store.notificationsEnabled,
-            onChanged: store.setNotificationsEnabled,
-          ),
-          SettingSwitch(
-            title: 'Email updates',
-            subtitle: 'Important updates and reminders',
-            value: store.emailUpdates,
-            onChanged: store.setEmailUpdates,
-          ),
-          const SizedBox(height: 20),
-          const ProfileOptionStatic(
-            icon: Icons.help_outline_rounded,
-            title: 'Help & support',
-          ),
-          const ProfileOptionStatic(
-            icon: Icons.description_outlined,
-            title: 'Terms & conditions',
-          ),
-          const ProfileOptionStatic(
-            icon: Icons.privacy_tip_outlined,
-            title: 'Privacy policy',
-          ),
-        ],
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+            children: [
+              SettingSwitch(
+                title: 'Push notifications',
+                subtitle: 'Booking and account updates',
+                value: store.notificationsEnabled,
+                onChanged: store.setNotificationsEnabled,
+              ),
+              SettingSwitch(
+                title: 'Email updates',
+                subtitle: 'Important updates and reminders',
+                value: store.emailUpdates,
+                onChanged: store.setEmailUpdates,
+              ),
+              const SizedBox(height: 20),
+              const ProfileOptionStatic(
+                icon: Icons.help_outline_rounded,
+                title: 'Help & support',
+              ),
+              const ProfileOptionStatic(
+                icon: Icons.description_outlined,
+                title: 'Terms & conditions',
+              ),
+              const ProfileOptionStatic(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy policy',
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,13 +1,19 @@
 import 'dart:developer' as developer;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/user_model.dart';
 import 'firebase_service.dart';
 
 class AuthService {
   final FirebaseAuth? _customAuth;
+  final GoogleSignIn _googleSignIn;
 
-  AuthService({FirebaseAuth? auth}) : _customAuth = auth;
+  AuthService({
+    FirebaseAuth? auth,
+    GoogleSignIn? googleSignIn,
+  })  : _customAuth = auth,
+        _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   FirebaseAuth get _auth => _customAuth ?? FirebaseAuth.instance;
 
@@ -70,6 +76,10 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    try {
+      await _googleSignIn.signOut().catchError((_) => null);
+    } catch (_) {}
+
     if (!FirebaseService.instance.isInitialized) return;
     try {
       await _auth.signOut();
@@ -92,15 +102,35 @@ class AuthService {
   }
 
   Future<UserCredential> signInWithGoogle() async {
-    // Architectural preparation for Google Sign-In:
-    // Requires SHA-1 fingerprint and google_sign_in package configuration.
     if (!FirebaseService.instance.isInitialized) {
-      throw const AuthException('Firebase is not configured.');
+      throw const AuthException('Firebase is not configured. Please supply Firebase credentials.');
     }
-    throw const AuthException(
-      'Google Sign-In requires SHA-1 fingerprint configuration in Firebase Console.',
-      code: 'GOOGLE_SIGN_IN_PENDING_CONFIG',
-    );
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw const AuthException(
+          'Google sign-in was cancelled.',
+          code: 'SIGN_IN_CANCELLED',
+        );
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      developer.log('Google Sign-In Auth Error: ${e.code}', name: 'AuthService', error: e);
+      throw AuthException(_mapFirebaseAuthError(e), code: e.code);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      developer.log('Google Sign-In Error: $e', name: 'AuthService', error: e);
+      throw AuthException('Failed to sign in with Google: $e');
+    }
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException e) {

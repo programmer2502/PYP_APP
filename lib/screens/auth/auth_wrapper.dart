@@ -29,11 +29,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (widget.authProvider.isAuthenticated) {
           final userModel = widget.authProvider.userModel;
           if (userModel != null) {
-            widget.store.user.name = userModel.name;
-            widget.store.user.email = userModel.email;
-            widget.store.user.phone = userModel.phone;
-            widget.store.user.city = userModel.city;
-            widget.store.role = userModel.role;
+            widget.store.syncAuthenticatedUser(userModel);
           }
 
           return HomeScreen(
