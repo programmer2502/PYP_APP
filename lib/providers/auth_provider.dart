@@ -90,6 +90,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String name,
     required UserRole role,
+    String phone = '',
     String city = 'Bengaluru',
   }) async {
     _isLoading = true;
@@ -109,6 +110,7 @@ class AuthProvider extends ChangeNotifier {
           uid: credential.user!.uid,
           name: name,
           email: email,
+          phone: phone,
           city: city,
           role: role,
           createdAt: DateTime.now(),

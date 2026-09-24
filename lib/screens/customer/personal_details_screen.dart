@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/pyp_store.dart';
@@ -56,6 +57,15 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> {
         ? 'user@example.com'
         : emailController.text.trim();
     final phone = phoneController.text.trim();
+    if (phone.isNotEmpty && phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit phone number.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _saving = true;

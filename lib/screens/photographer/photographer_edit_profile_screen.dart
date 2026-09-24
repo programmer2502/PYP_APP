@@ -59,6 +59,17 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
   }
 
   void save() {
+    final phone = phoneController.text.trim();
+    if (phone.isNotEmpty && phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid 10-digit phone number.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     widget.store.updatePhotographer(
       name: nameController.text.trim(),
       category: category,
@@ -66,7 +77,7 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
       price: priceController.text.trim(),
       location: location.trim(),
       bio: bioController.text.trim(),
-      phone: phoneController.text.trim(),
+      phone: phone,
       email: emailController.text.trim(),
       instagram: instagramController.text.trim(),
     );
@@ -157,6 +168,7 @@ class _PhotographerEditProfileState extends State<PhotographerEditProfile> {
           controller: phoneController,
           label: 'Phone',
           icon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
         ),
         PypTextField(
           controller: emailController,

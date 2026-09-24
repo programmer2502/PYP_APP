@@ -24,6 +24,7 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   UserRole _selectedRole = UserRole.customer;
@@ -52,6 +53,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -63,6 +65,7 @@ class _SignupScreenState extends State<SignupScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text.trim(),
       name: _nameController.text.trim(),
+      phone: _phoneController.text.trim(),
       role: _selectedRole,
       city: _selectedCity,
     );
@@ -232,6 +235,14 @@ class _SignupScreenState extends State<SignupScreen> {
                   label: 'Email address',
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
+                  requiredField: true,
+                ),
+                PypTextField(
+                  controller: _phoneController,
+                  label: 'Phone number',
+                  hint: '10-digit mobile number',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
                   requiredField: true,
                 ),
                 PypTextField(
