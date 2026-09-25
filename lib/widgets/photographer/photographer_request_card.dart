@@ -64,17 +64,21 @@ class PhotographerRequestCard extends StatelessWidget {
     final bgColor = statusBgColor(booking.status);
     final icon = statusIcon(booking.status);
     final isPending = booking.status.toLowerCase() == 'pending';
+    final isPaid = booking.paymentStatus == PaymentStatus.paid;
+    final isChatUnlocked = isPaid && booking.chatEnabled;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(17),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: booking.status.toLowerCase() == 'accepted'
-              ? const Color(0xFF4ADE80).withValues(alpha: 0.25)
-              : AppColors.borderSubtle,
+          color: isChatUnlocked
+              ? const Color(0xFF10B981).withValues(alpha: 0.35)
+              : (booking.status.toLowerCase() == 'accepted'
+                  ? const Color(0xFF4ADE80).withValues(alpha: 0.25)
+                  : AppColors.borderSubtle),
         ),
       ),
       child: Column(
@@ -122,7 +126,7 @@ class PhotographerRequestCard extends StatelessWidget {
           Text(
             booking.category,
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 17,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -174,7 +178,7 @@ class PhotographerRequestCard extends StatelessWidget {
               Text(
                 booking.price,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -182,7 +186,7 @@ class PhotographerRequestCard extends StatelessWidget {
             ],
           ),
           if (booking.customerId.isNotEmpty || booking.customerEmail.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
                 const Icon(
@@ -202,12 +206,46 @@ class PhotographerRequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isPaid
+                        ? const Color(0xFF14532D)
+                        : Colors.white10,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isPaid
+                          ? Colors.greenAccent.withValues(alpha: 0.3)
+                          : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPaid ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
+                        size: 11,
+                        color: isPaid ? Colors.greenAccent : Colors.white60,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isPaid ? 'PAID' : 'UNPAID',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isPaid ? Colors.greenAccent : Colors.white60,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ],
           if (booking.notes.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: AppColors.cardElevated,
@@ -263,20 +301,59 @@ class PhotographerRequestCard extends StatelessWidget {
               ],
             ),
           ],
-          if (onMessage != null) ...[
-            const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: onMessage,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                foregroundColor: Colors.white,
-                backgroundColor: AppColors.cardElevated,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+
+          // Payment / Chat status indicator for photographer
+          if (!isPaid && !isPending) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF18181B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lock_rounded, size: 14, color: Color(0xFFFBBF24)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Chat locked until customer completes payment.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Chat button available strictly after verified payment
+          if (isChatUnlocked && onMessage != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: onMessage,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                icon: const Icon(Icons.chat_bubble_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Chat with Customer',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 ),
               ),
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
-              label: const Text('Message Client', style: TextStyle(fontSize: 12)),
             ),
           ],
         ],

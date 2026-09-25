@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../models/booking_model.dart';
 import '../models/conversation_model.dart';
 import '../models/photographer_model.dart';
 import '../repositories/chat_repository.dart';
@@ -158,6 +159,74 @@ class ChatProvider extends ChangeNotifier {
       );
     } catch (_) {
       // Retained in-memory if offline
+    }
+  }
+
+  Future<String> openBookingConversation({
+    required BookingModel booking,
+    required String currentUserId,
+    required String currentUserName,
+    List<String>? userAliases,
+  }) async {
+    final photoId = booking.photographerId.isNotEmpty
+        ? booking.photographerId
+        : (booking.photographerUid.isNotEmpty ? booking.photographerUid : booking.photographerName);
+
+    final safeBookingId = booking.id.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    final convoId = booking.conversationId != null && booking.conversationId!.isNotEmpty
+        ? booking.conversationId!
+        : 'convo_bk_$safeBookingId';
+
+    final allParticipants = <String>{
+      booking.customerId,
+      booking.customerName,
+      booking.customerEmail,
+      booking.customerPhone,
+      ...booking.customerIdentifiers,
+      photoId,
+      booking.photographerName,
+      booking.photographerEmail,
+      ...booking.photographerIdentifiers,
+      currentUserId,
+      currentUserName,
+      ...?userAliases,
+    }.where((s) => s.trim().isNotEmpty && s != 'user@example.com' && s != 'PYP User').toList();
+
+    // Check if already in active list
+    final existingIndex = _conversations.indexWhere((c) => c.id == convoId || (c.bookingId != null && c.bookingId == booking.id));
+    if (existingIndex != -1) {
+      return _conversations[existingIndex].id;
+    }
+
+    final newConvo = ConversationModel(
+      id: convoId,
+      bookingId: booking.id,
+      customerId: booking.customerId.isNotEmpty ? booking.customerId : currentUserId,
+      photographerId: photoId,
+      customerName: booking.customerName.isNotEmpty ? booking.customerName : currentUserName,
+      photographerName: booking.photographerName,
+      participants: allParticipants,
+      lastMessage: 'Booking chat unlocked',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    _conversations.insert(0, newConvo);
+    _localMessageStore[convoId] = [];
+    notifyListeners();
+
+    try {
+      final serverId = await _repository.getOrCreateConversation(
+        customerId: booking.customerId.isNotEmpty ? booking.customerId : currentUserId,
+        photographerId: photoId,
+        bookingId: booking.id,
+        customerName: booking.customerName.isNotEmpty ? booking.customerName : currentUserName,
+        photographerName: booking.photographerName,
+        allParticipants: allParticipants,
+      );
+      return serverId;
+    } catch (_) {
+      return convoId;
     }
   }
 

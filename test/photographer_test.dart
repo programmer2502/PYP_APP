@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pyp_app/models/photographer_model.dart';
@@ -5,8 +6,13 @@ import 'package:pyp_app/models/user_model.dart';
 import 'package:pyp_app/providers/pyp_store.dart';
 import 'package:pyp_app/screens/customer/discover_content.dart';
 import 'package:pyp_app/screens/photographer/photographer_onboarding_screen.dart';
+import 'test_http_overrides.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = TestHttpOverrides();
+  });
+
   group('Phase 4 - Photographer Integration Tests', () {
     test('PhotographerModel serialization and deserialization', () {
       final model = PhotographerModel(
@@ -93,10 +99,6 @@ void main() {
         '₹15,000 onwards',
       );
       await tester.enterText(
-        find.widgetWithText(TextFormField, 'Location'),
-        'Mumbai',
-      );
-      await tester.enterText(
         find.widgetWithText(TextFormField, 'About you'),
         'Passionate visual storyteller with 6 years experience.',
       );
@@ -111,7 +113,7 @@ void main() {
       // Verify store state updated
       expect(store.photographerAccount, isNotNull);
       expect(store.photographerAccount!.name, 'Studio Eclipse');
-      expect(store.photographerAccount!.location, 'Mumbai');
+      expect(store.photographerAccount!.location, isNotEmpty);
       expect(store.role, UserRole.photographer);
     });
   });

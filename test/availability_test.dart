@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pyp_app/models/availability_model.dart';
@@ -6,8 +7,13 @@ import 'package:pyp_app/models/photographer_model.dart';
 import 'package:pyp_app/providers/pyp_store.dart';
 import 'package:pyp_app/screens/customer/booking_screen.dart';
 import 'package:pyp_app/screens/photographer/photographer_calendar_content.dart';
+import 'test_http_overrides.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = TestHttpOverrides();
+  });
+
   group('Phase 7 - Availability & Double-Booking Protection', () {
     test('AvailabilityModel serialization and deserialization', () {
       final now = DateTime(2026, 10, 24);

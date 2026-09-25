@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pyp_app/models/photographer_model.dart';
 import 'package:pyp_app/providers/pyp_store.dart';
 import 'package:pyp_app/screens/customer/saved_photographers_screen.dart';
 import 'package:pyp_app/widgets/customer/photographer_list_card.dart';
+import 'test_http_overrides.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = TestHttpOverrides();
+  });
+
   group('Phase 8 - Favorites Synchronization Tests', () {
     testWidgets('SavedPhotographersScreen displays empty state when nothing saved',
         (WidgetTester tester) async {
@@ -90,7 +96,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Initially not saved
-      expect(store.isSaved('Frame Stories'), false);
+      expect(store.isPhotographerSaved(photographer), false);
       expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
 
       // Tap favorite icon
@@ -98,7 +104,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify saved in store
-      expect(store.isSaved('Frame Stories'), true);
+      expect(store.isPhotographerSaved(photographer), true);
     });
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/booking_model.dart';
 import '../../models/photographer_model.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
@@ -112,7 +113,12 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 
   void _openNewChatSheet() {
-    final photographers = widget.store?.photographers ?? [];
+    final isPhotographerMode = widget.store?.role == UserRole.photographer;
+    final relevantBookings = (isPhotographerMode
+            ? (widget.store?.photographerRequests ?? [])
+            : (widget.store?.customerBookings ?? []))
+        .where((b) => b.paymentStatus == PaymentStatus.paid && b.chatEnabled)
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -148,7 +154,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'New Message',
+                        'Verified Bookings Chat',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
@@ -162,7 +168,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     ],
                   ),
                   const Text(
-                    'Select a photographer to start a conversation',
+                    'Select a verified booking to open your direct chat',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textTertiary,
@@ -170,96 +176,131 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   ),
                   const SizedBox(height: 16),
                   Expanded(
-                    child: photographers.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No photographers available',
-                              style: TextStyle(color: AppColors.textTertiary),
-                            ),
-                          )
-                        : ListView.separated(
-                            controller: scrollController,
-                            itemCount: photographers.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 8),
-                            itemBuilder: (_, idx) {
-                              final p = photographers[idx];
-                              return ListTile(
-                                tileColor: AppColors.surface,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  side: BorderSide(color: AppColors.borderLight),
+                    child: relevantBookings.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white12),
                                 ),
-                                leading: CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: AppColors.cardElevated,
-                                  backgroundImage: p.profileImageUrl != null
-                                      ? NetworkImage(p.profileImageUrl!)
-                                      : null,
-                                  child: p.profileImageUrl == null
-                                      ? Text(
-                                          p.name.isNotEmpty ? p.name[0].toUpperCase() : 'P',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      : null,
+                                child: const Icon(
+                                  Icons.lock_rounded,
+                                  size: 24,
+                                  color: Color(0xFFFBBF24),
                                 ),
-                                title: Text(
-                                  p.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
+                              ),
+                              const SizedBox(height: 14),
+                              const Text(
+                                'No Paid Bookings Available',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
                                 ),
-                                subtitle: Text(
-                                  '${p.category} • ${p.price}',
-                                  style: const TextStyle(
+                              ),
+                              const SizedBox(height: 6),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 20),
+                                child: Text(
+                                  'Chat is enabled strictly after booking payment is verified on Razorpay.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
                                     color: AppColors.textTertiary,
                                     fontSize: 12,
                                   ),
                                 ),
-                                trailing: const Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  color: Colors.white70,
-                                  size: 20,
-                                ),
-                                onTap: () async {
-                                  Navigator.pop(ctx);
-                                  final identifiers = _resolveUserIdentifiers();
-                                  final currentUserId = identifiers.first;
-                                  final customerName = widget.store?.user.name.isNotEmpty == true &&
-                                          widget.store?.user.name != 'PYP User'
-                                      ? widget.store!.user.name
-                                      : 'Customer';
-
-                                  final convoId = await _provider.startConversationWithPhotographer(
-                                    customerId: currentUserId,
-                                    customerName: customerName,
-                                    photographer: p,
-                                    customerAliases: identifiers,
-                                  );
-
-                                  if (mounted) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => ChatRoomScreen(
-                                          conversationId: convoId,
-                                          recipientName: p.name,
-                                          recipientId: p.id.isNotEmpty ? p.id : p.name,
-                                          recipientPhoto: p.profileImageUrl,
-                                          currentUserId: currentUserId,
-                                          chatProvider: _provider,
-                                          store: widget.store,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                              );
-                            },
+                              ),
+                            ],
                           ),
+                        )
+                      : ListView.separated(
+                          controller: scrollController,
+                          itemCount: relevantBookings.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 8),
+                          itemBuilder: (_, idx) {
+                            final b = relevantBookings[idx];
+                            final title = isPhotographerMode
+                                ? (b.customerName.isNotEmpty ? b.customerName : 'Client')
+                                : b.photographerName;
+
+                            return ListTile(
+                              tileColor: AppColors.surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: BorderSide(color: AppColors.borderLight),
+                              ),
+                              leading: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                child: Text(
+                                  title.isNotEmpty ? title[0].toUpperCase() : 'P',
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${b.category} • ${b.price} (Verified)',
+                                style: const TextStyle(
+                                  color: Color(0xFF34D399),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chat_bubble_rounded,
+                                color: Colors.greenAccent,
+                                size: 20,
+                              ),
+                              onTap: () async {
+                                Navigator.pop(ctx);
+                                final identifiers = _resolveUserIdentifiers();
+                                final currentUserId = identifiers.first;
+                                final userName = widget.store?.user.name.isNotEmpty == true &&
+                                        widget.store?.user.name != 'PYP User'
+                                    ? widget.store!.user.name
+                                    : 'User';
+
+                                final convoId = await _provider.openBookingConversation(
+                                  booking: b,
+                                  currentUserId: currentUserId,
+                                  currentUserName: userName,
+                                  userAliases: identifiers,
+                                );
+
+                                if (mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatRoomScreen(
+                                        conversationId: convoId,
+                                        bookingId: b.id,
+                                        recipientName: title,
+                                        recipientId: isPhotographerMode ? b.customerId : b.photographerId,
+                                        currentUserId: currentUserId,
+                                        chatProvider: _provider,
+                                        store: widget.store,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
                   ),
                 ],
               ),

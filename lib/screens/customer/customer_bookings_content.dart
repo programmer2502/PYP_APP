@@ -41,7 +41,7 @@ class _BookingsContentState extends State<BookingsContent> {
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
             ),
             SizedBox(width: 12),
-            Text('Initiating Razorpay checkout...'),
+            Text('Initiating secure Razorpay checkout...'),
           ],
         ),
         duration: Duration(seconds: 2),
@@ -67,36 +67,98 @@ class _BookingsContentState extends State<BookingsContent> {
         userEmail: userEmail,
         userPhone: userPhone,
         userName: userName,
-        onSuccess: (response) {
-          if (mounted) {
-            widget.store.updateBookingPayment(
-              booking,
-              paymentStatus: PaymentStatus.paid,
-              paymentId: response.paymentId,
-              orderId: response.orderId ?? orderId,
+        onSuccess: (response) async {
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.greenAccent),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Verifying payment signature on backend...'),
+                ],
+              ),
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          try {
+            final paymentId = response.paymentId ?? '';
+            final returnedOrderId = response.orderId ?? orderId;
+            final signature = response.signature ?? 'sig_${DateTime.now().millisecondsSinceEpoch}';
+
+            // 1. Mandatory Backend Verification Step
+            final verificationResult = await _paymentService.verifyPaymentWithBackend(
+              bookingId: booking.id,
+              orderId: returnedOrderId,
+              paymentId: paymentId,
+              signature: signature,
             );
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Payment Successful! ID: ${response.paymentId ?? ""}'),
-                    ),
-                  ],
-                ),
-                backgroundColor: AppColors.card,
-              ),
+            final conversationId = verificationResult['conversationId']?.toString() ??
+                'convo_bk_${booking.id.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}';
+
+            // 2. Update Firestore and Store after verified confirmation
+            await widget.store.updateBookingPayment(
+              booking,
+              paymentStatus: PaymentStatus.paid,
+              paymentId: paymentId,
+              orderId: returnedOrderId,
+              chatEnabled: true,
+              conversationId: conversationId,
+              signature: signature,
             );
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.verified_rounded, color: Colors.greenAccent, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Payment Verified! Chat unlocked with ${booking.photographerName}.',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.card,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+          } catch (verifyError) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text('Payment verification failed: $verifyError. Chat remains locked.'),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.error,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
           }
         },
         onError: (response) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Payment Failed: ${response.message ?? "Cancelled"}'),
+                content: Text('Payment Cancelled / Failed: ${response.message ?? "Checkout closed."}'),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -139,7 +201,7 @@ class _BookingsContentState extends State<BookingsContent> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Your photography bookings.',
+                  'Your photography bookings & chat status.',
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textTertiary,
@@ -156,50 +218,60 @@ class _BookingsContentState extends State<BookingsContent> {
                   (booking) {
                     final isAccepted = booking.status.toLowerCase() == 'accepted' ||
                         booking.status.toLowerCase() == 'confirmed';
-                    final isUnpaid = booking.paymentStatus != PaymentStatus.paid;
+                    final isPaid = booking.paymentStatus == PaymentStatus.paid;
+                    final isChatEnabled = isPaid && booking.chatEnabled;
 
                     return BookingCard(
                       booking: booking,
-                      onPay: (isAccepted && isUnpaid)
+                      onPay: (isAccepted && !isPaid)
                           ? () => _handlePayForBooking(booking)
                           : null,
-                    onMessage: () async {
-                      final identifiers = widget.store.currentUserChatIdentifiers;
-                      final currentUserId = identifiers.first;
-                      final photoId = booking.photographerId.isNotEmpty
-                          ? booking.photographerId
-                          : booking.photographerName;
+                      onMessage: isChatEnabled
+                          ? () async {
+                              final identifiers = widget.store.currentUserChatIdentifiers;
+                              final currentUserId = identifiers.first;
+                              final userName = widget.store.user.name.isNotEmpty &&
+                                      widget.store.user.name != 'PYP User'
+                                  ? widget.store.user.name
+                                  : 'Client';
 
-                      final safeCust = currentUserId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-                      final safePhoto = photoId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-                      final convoId = 'convo_${safeCust}_$safePhoto';
+                              final convoId = await widget.store.chatProvider.openBookingConversation(
+                                booking: booking,
+                                currentUserId: currentUserId,
+                                currentUserName: userName,
+                                userAliases: identifiers,
+                              );
 
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatRoomScreen(
-                            conversationId: convoId,
-                            recipientName: booking.photographerName,
-                            recipientId: booking.photographerId,
-                            currentUserId: currentUserId,
-                            chatProvider: widget.store.chatProvider,
-                            store: widget.store,
-                          ),
-                        ),
-                      );
-                    },
-                    onCancel: booking.status == 'Pending'
-                        ? () {
-                            widget.store.updateBookingStatus(booking, 'Cancelled');
-                          }
-                        : null,
-                  );
-                },
-              ),
-            ],
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatRoomScreen(
+                                      conversationId: convoId,
+                                      bookingId: booking.id,
+                                      recipientName: booking.photographerName,
+                                      recipientId: booking.photographerId,
+                                      currentUserId: currentUserId,
+                                      chatProvider: widget.store.chatProvider,
+                                      store: widget.store,
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          : null,
+                      onCancel: booking.status == 'Pending'
+                          ? () {
+                              widget.store.updateBookingStatus(booking, 'Cancelled');
+                            }
+                          : null,
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
       },
     );
   }

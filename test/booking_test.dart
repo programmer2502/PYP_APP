@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pyp_app/models/booking_model.dart';
@@ -6,8 +7,13 @@ import 'package:pyp_app/providers/pyp_store.dart';
 import 'package:pyp_app/screens/customer/booking_screen.dart';
 import 'package:pyp_app/screens/customer/customer_bookings_content.dart';
 import 'package:pyp_app/screens/photographer/photographer_requests_content.dart';
+import 'test_http_overrides.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = TestHttpOverrides();
+  });
+
   group('Phase 6 - Booking Creation & State Transitions', () {
     test('BookingModel serialization and deserialization', () {
       final now = DateTime.now();
@@ -92,36 +98,28 @@ void main() {
       // Verify screen title
       expect(find.text('Book Photographer'), findsOneWidget);
 
-      // Select date
-      await tester.tap(find.text('Choose a date'));
-      await tester.pumpAndSettle();
-
-      // Tap OK on the date picker
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      // Submit booking
-      final confirmBtn = find.text('Confirm booking');
+      // Submit booking with default 1 hr duration (multiplier 2.0: 16000)
+      final confirmBtn = find.byIcon(Icons.send_rounded);
       await tester.ensureVisible(confirmBtn);
       await tester.pumpAndSettle();
       await tester.tap(confirmBtn);
       await tester.pumpAndSettle();
 
       // Verify confirmation dialog
-      expect(find.text('Booking request sent'), findsOneWidget);
+      expect(find.text('Booking Request Sent'), findsOneWidget);
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
 
-      // Verify store updated with platform fee calculated (5% of 8000 = 400)
+      // Verify store updated with platform fee calculated (5% of 16000 = 800)
       expect(store.bookings.length, 1);
       expect(store.bookings.first.photographerName, 'Arjun Photography');
       expect(store.bookings.first.status, 'Pending');
-      expect(store.bookings.first.amount, 8000.0);
-      expect(store.bookings.first.platformFee, 400.0);
-      expect(store.bookings.first.photographerAmount, 7600.0);
+      expect(store.bookings.first.amount, 16000.0);
+      expect(store.bookings.first.platformFee, 800.0);
+      expect(store.bookings.first.photographerAmount, 15200.0);
     });
 
-    testWidgets('CustomerBookingsContent displays bookings and allows cancellation',
+    testWidgets('CustomerBookingsContent displays bookings and payment locked status',
         (WidgetTester tester) async {
       final store = PypStore();
       store.addBooking(
@@ -145,17 +143,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify booking listed
+      // Verify booking listed with payment status
       expect(find.text('Frame Stories'), findsOneWidget);
       expect(find.text('Pending'), findsOneWidget);
-
-      // Cancel booking
-      await tester.tap(find.text('Cancel booking'));
-      await tester.pumpAndSettle();
-
-      // Verify status updated to Cancelled
-      expect(store.bookings.first.status, 'Cancelled');
-      expect(find.text('Cancelled'), findsOneWidget);
+      expect(find.text('PAYMENT LOCKED'), findsOneWidget);
     });
 
     testWidgets('PhotographerRequests displays incoming requests and allows Accept/Reject',

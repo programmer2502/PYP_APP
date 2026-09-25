@@ -109,8 +109,12 @@ class BookingModel {
   final double photographerAmount;
   String status;
   final PaymentStatus paymentStatus;
+  final bool chatEnabled;
+  final DateTime? chatEnabledAt;
+  final String? conversationId;
   final String? razorpayPaymentId;
   final String? razorpayOrderId;
+  final String? razorpaySignature;
   final String price;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -139,8 +143,12 @@ class BookingModel {
     this.photographerAmount = 0.0,
     required this.status,
     this.paymentStatus = PaymentStatus.unpaid,
+    this.chatEnabled = false,
+    this.chatEnabledAt,
+    this.conversationId,
     this.razorpayPaymentId,
     this.razorpayOrderId,
+    this.razorpaySignature,
     required this.price,
     this.createdAt,
     this.updatedAt,
@@ -195,6 +203,13 @@ class BookingModel {
         ? rawPhotoIds.map((e) => e.toString()).toList()
         : <String>[];
 
+    DateTime? parsedChatEnabledAt;
+    if (map['chatEnabledAt'] is Timestamp) {
+      parsedChatEnabledAt = (map['chatEnabledAt'] as Timestamp).toDate();
+    } else if (map['chatEnabledAt'] is String) {
+      parsedChatEnabledAt = DateTime.tryParse(map['chatEnabledAt'] as String);
+    }
+
     return BookingModel(
       id: docId,
       customerId: map['customerId'] as String? ?? '',
@@ -223,8 +238,12 @@ class BookingModel {
       photographerAmount: (map['photographerAmount'] as num?)?.toDouble() ?? 0.0,
       status: map['status'] as String? ?? 'Pending',
       paymentStatus: PaymentStatus.fromString(map['paymentStatus'] as String?),
+      chatEnabled: map['chatEnabled'] as bool? ?? false,
+      chatEnabledAt: parsedChatEnabledAt,
+      conversationId: map['conversationId'] as String?,
       razorpayPaymentId: map['razorpayPaymentId'] as String?,
       razorpayOrderId: map['razorpayOrderId'] as String?,
+      razorpaySignature: map['razorpaySignature'] as String?,
       price: map['price'] as String? ?? (map['amount'] != null ? '₹${map['amount']}' : '₹0'),
       createdAt: map['createdAt'] is Timestamp
           ? (map['createdAt'] as Timestamp).toDate()
@@ -279,8 +298,12 @@ class BookingModel {
       'photographerAmount': photographerAmount,
       'status': status,
       'paymentStatus': paymentStatus.value,
-      'razorpayPaymentId': razorpayPaymentId,
-      'razorpayOrderId': razorpayOrderId,
+      'chatEnabled': chatEnabled,
+      if (chatEnabledAt != null) 'chatEnabledAt': Timestamp.fromDate(chatEnabledAt!),
+      if (conversationId != null) 'conversationId': conversationId,
+      if (razorpayPaymentId != null) 'razorpayPaymentId': razorpayPaymentId,
+      if (razorpayOrderId != null) 'razorpayOrderId': razorpayOrderId,
+      if (razorpaySignature != null) 'razorpaySignature': razorpaySignature,
       'price': price,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -311,8 +334,12 @@ class BookingModel {
     double? photographerAmount,
     String? status,
     PaymentStatus? paymentStatus,
+    bool? chatEnabled,
+    DateTime? chatEnabledAt,
+    String? conversationId,
     String? razorpayPaymentId,
     String? razorpayOrderId,
+    String? razorpaySignature,
     String? price,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -341,8 +368,12 @@ class BookingModel {
       photographerAmount: photographerAmount ?? this.photographerAmount,
       status: status ?? this.status,
       paymentStatus: paymentStatus ?? this.paymentStatus,
+      chatEnabled: chatEnabled ?? this.chatEnabled,
+      chatEnabledAt: chatEnabledAt ?? this.chatEnabledAt,
+      conversationId: conversationId ?? this.conversationId,
       razorpayPaymentId: razorpayPaymentId ?? this.razorpayPaymentId,
       razorpayOrderId: razorpayOrderId ?? this.razorpayOrderId,
+      razorpaySignature: razorpaySignature ?? this.razorpaySignature,
       price: price ?? this.price,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

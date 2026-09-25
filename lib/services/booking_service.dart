@@ -155,6 +155,9 @@ class BookingService {
     required PaymentStatus paymentStatus,
     String? paymentId,
     String? orderId,
+    bool? chatEnabled,
+    String? conversationId,
+    String? signature,
   }) async {
     if (!_firestoreService.isReady) return;
 
@@ -169,6 +172,18 @@ class BookingService {
       if (orderId != null && orderId.isNotEmpty) {
         data['razorpayOrderId'] = orderId;
       }
+      if (chatEnabled != null) {
+        data['chatEnabled'] = chatEnabled;
+        if (chatEnabled) {
+          data['chatEnabledAt'] = FieldValue.serverTimestamp();
+        }
+      }
+      if (conversationId != null && conversationId.isNotEmpty) {
+        data['conversationId'] = conversationId;
+      }
+      if (signature != null && signature.isNotEmpty) {
+        data['razorpaySignature'] = signature;
+      }
 
       await _firestoreService
           .collection(FirestoreCollections.bookings)
@@ -176,6 +191,38 @@ class BookingService {
           .update(data);
     } catch (e) {
       throw FirestoreException('Failed to update booking payment: $e');
+    }
+  }
+
+  Future<void> unlockBookingChat({
+    required String bookingId,
+    required String conversationId,
+    required String paymentId,
+    required String orderId,
+    String? signature,
+  }) async {
+    if (!_firestoreService.isReady) return;
+
+    try {
+      final data = <String, dynamic>{
+        'paymentStatus': PaymentStatus.paid.value,
+        'chatEnabled': true,
+        'chatEnabledAt': FieldValue.serverTimestamp(),
+        'conversationId': conversationId,
+        'razorpayPaymentId': paymentId,
+        'razorpayOrderId': orderId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (signature != null && signature.isNotEmpty) {
+        data['razorpaySignature'] = signature;
+      }
+
+      await _firestoreService
+          .collection(FirestoreCollections.bookings)
+          .doc(bookingId)
+          .update(data);
+    } catch (e) {
+      throw FirestoreException('Failed to unlock booking chat: $e');
     }
   }
 }

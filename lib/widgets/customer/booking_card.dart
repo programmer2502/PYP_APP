@@ -64,17 +64,22 @@ class BookingCard extends StatelessWidget {
     final bgColor = statusBgColor(booking.status);
     final icon = statusIcon(booking.status);
     final isPaid = booking.paymentStatus == PaymentStatus.paid;
+    final isChatUnlocked = isPaid && booking.chatEnabled;
+    final isAccepted = booking.status.toLowerCase() == 'accepted' ||
+        booking.status.toLowerCase() == 'confirmed';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(17),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: booking.status.toLowerCase() == 'accepted'
-              ? const Color(0xFF4ADE80).withValues(alpha: 0.25)
-              : AppColors.borderSubtle,
+          color: isChatUnlocked
+              ? const Color(0xFF10B981).withValues(alpha: 0.35)
+              : (isAccepted
+                  ? const Color(0xFF4ADE80).withValues(alpha: 0.25)
+                  : AppColors.borderSubtle),
         ),
       ),
       child: Column(
@@ -86,7 +91,7 @@ class BookingCard extends StatelessWidget {
                 child: Text(
                   booking.photographerName,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -119,15 +124,15 @@ class BookingCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             booking.category,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               color: AppColors.textFaint,
             ),
           ),
-          const SizedBox(height: 13),
+          const SizedBox(height: 12),
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
@@ -190,13 +195,13 @@ class BookingCard extends StatelessWidget {
               Text(
                 booking.price,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: isPaid
                       ? const Color(0xFF14532D)
@@ -206,10 +211,10 @@ class BookingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isPaid
-                        ? Colors.greenAccent.withValues(alpha: 0.3)
+                        ? Colors.greenAccent.withValues(alpha: 0.35)
                         : (booking.status.toLowerCase() == 'pending'
                             ? Colors.white12
-                            : Colors.amberAccent.withValues(alpha: 0.3)),
+                            : Colors.amberAccent.withValues(alpha: 0.35)),
                   ),
                 ),
                 child: Row(
@@ -231,7 +236,7 @@ class BookingCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       isPaid
-                          ? 'PAID (Razorpay)'
+                          ? 'PAID (Verified)'
                           : (booking.status.toLowerCase() == 'pending'
                               ? 'PAYMENT LOCKED'
                               : 'READY TO PAY'),
@@ -268,7 +273,7 @@ class BookingCard extends StatelessWidget {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Waiting for photographer to accept. Payment unlocks upon acceptance.',
+                      'Waiting for photographer to accept. Payment & chat unlock upon acceptance.',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -279,10 +284,7 @@ class BookingCard extends StatelessWidget {
                 ],
               ),
             ),
-          ] else if ((booking.status.toLowerCase() == 'accepted' ||
-                  booking.status.toLowerCase() == 'confirmed') &&
-              !isPaid &&
-              onPay != null) ...[
+          ] else if (isAccepted && !isPaid) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -294,11 +296,11 @@ class BookingCard extends StatelessWidget {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF34D399)),
+                  Icon(Icons.lock_rounded, size: 14, color: Color(0xFFFBBF24)),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Photographer accepted! Please complete payment to secure your slot.',
+                      'Photographer accepted! Complete payment below to unlock chat & secure booking.',
                       style: TextStyle(
                         fontSize: 11,
                         color: Color(0xFF34D399),
@@ -309,25 +311,56 @@ class BookingCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (onPay != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: onPay,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  icon: const Icon(Icons.flash_on_rounded, size: 16, color: Colors.black),
+                  label: Text(
+                    'Pay with Razorpay • ${booking.price}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+
+          // Post-Payment Actions: Chat with Photographer (GATED)
+          if (isChatUnlocked) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               height: 44,
               child: ElevatedButton.icon(
-                onPressed: onPay,
+                onPressed: onMessage,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  elevation: 2,
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
-                icon: const Icon(Icons.flash_on_rounded, size: 16, color: Colors.black),
-                label: Text(
-                  'Pay with Razorpay • ${booking.price}',
-                  style: const TextStyle(
+                icon: const Icon(Icons.chat_bubble_rounded, size: 16, color: Colors.white),
+                label: const Text(
+                  'Chat with Photographer',
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
@@ -335,35 +368,19 @@ class BookingCard extends StatelessWidget {
               ),
             ),
           ],
-          if (onMessage != null || onCancel != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (onMessage != null)
-                  TextButton.icon(
-                    onPressed: onMessage,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      foregroundColor: Colors.white,
-                      backgroundColor: AppColors.cardElevated,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
-                    label: const Text('Message', style: TextStyle(fontSize: 12)),
-                  ),
-                if (onMessage != null && onCancel != null) const SizedBox(width: 10),
-                if (onCancel != null)
-                  TextButton(
-                    onPressed: onCancel,
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      foregroundColor: AppColors.textTertiary,
-                    ),
-                    child: const Text('Cancel booking'),
-                  ),
-              ],
+
+          if (booking.status == 'Pending' && onCancel != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: onCancel,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  foregroundColor: AppColors.textTertiary,
+                ),
+                child: const Text('Cancel booking request', style: TextStyle(fontSize: 12)),
+              ),
             ),
           ],
         ],

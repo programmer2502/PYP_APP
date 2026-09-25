@@ -2,7 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -14,6 +16,21 @@ service cloud.firestore {
     function isUserInRole(role) {
       return isAuthenticated() && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isConversationParticipant(data) {
+      return isAuthenticated() && (
+        data.customerId == request.auth.uid ||
+        data.photographerId == request.auth.uid ||
+        (data.participants != null && request.auth.uid in data.participants)
+      );
+    }
+
+    function isPaidBooking(bookingId) {
+      return bookingId != null &&
+        exists(/databases/$(database)/documents/bookings/$(bookingId)) &&
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.paymentStatus == 'paid' &&
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.chatEnabled == true;
     }
 
     // ==========================================
@@ -79,14 +96,18 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
         request.resource.data.customerId == request.auth.uid &&
         request.resource.data.status == 'Pending' &&
-        request.resource.data.paymentStatus == 'unpaid';
+        request.resource.data.paymentStatus == 'unpaid' &&
+        (request.resource.data.chatEnabled == false || request.resource.data.chatEnabled == null);
       
-      // Status updates: strictly validated transitions
+      // Status updates: strictly validated transitions.
+      // paymentStatus, chatEnabled, and conversationId can NEVER be forged directly by client.
       allow update: if isAuthenticated() && (
         // Customer can only cancel their own pending booking
         (resource.data.customerId == request.auth.uid &&
          request.resource.data.status == 'Cancelled' &&
-         resource.data.status == 'Pending') ||
+         resource.data.status == 'Pending' &&
+         request.resource.data.paymentStatus == resource.data.paymentStatus &&
+         request.resource.data.chatEnabled == resource.data.chatEnabled) ||
         
         // Photographer can accept, reject, or cancel their bookings
         (resource.data.photographerId == request.auth.uid && (
@@ -94,7 +115,9 @@ service cloud.firestore {
           (request.resource.data.status == 'Rejected' && resource.data.status == 'Pending') ||
           (request.resource.data.status == 'Cancelled' && resource.data.status == 'Accepted') ||
           (request.resource.data.status == 'Completed' && resource.data.status == 'Accepted')
-        ))
+        ) &&
+         request.resource.data.paymentStatus == resource.data.paymentStatus &&
+         request.resource.data.chatEnabled == resource.data.chatEnabled)
       );
       
       allow delete: if false; // Bookings must not be arbitrarily deleted
@@ -126,26 +149,33 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // CONVERSATIONS & CHAT
+    // CONVERSATIONS & CHAT (Payment-Gated Security)
     // ==========================================
     match /conversations/{conversationId} {
-      allow read, update: if isAuthenticated() && (
-        resource.data.customerId == request.auth.uid ||
-        resource.data.photographerId == request.auth.uid
-      );
-      allow create: if isAuthenticated() && (
-        request.resource.data.customerId == request.auth.uid ||
-        request.resource.data.photographerId == request.auth.uid
-      );
+      // Reading/updating conversation requires participant status AND verified paid booking
+      allow read: if isConversationParticipant(resource.data) &&
+        (resource.data.bookingId == null || isPaidBooking(resource.data.bookingId));
+        
+      allow update: if isConversationParticipant(resource.data) &&
+        (resource.data.bookingId == null || isPaidBooking(resource.data.bookingId));
       
+      allow create: if isConversationParticipant(request.resource.data) &&
+        (request.resource.data.bookingId == null || isPaidBooking(request.resource.data.bookingId));
+      
+      // Messages Subcollection: Strict enforcement of payment-gated chat
       match /messages/{messageId} {
-        allow read: if isAuthenticated() && (
-          get(/databases/$(database)/documents/conversations/$(conversationId)).data.customerId == request.auth.uid ||
-          get(/databases/$(database)/documents/conversations/$(conversationId)).data.photographerId == request.auth.uid
-        );
-        allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+        allow read: if isConversationParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data) &&
+          (get(/databases/$(database)/documents/conversations/$(conversationId)).data.bookingId == null ||
+           isPaidBooking(get(/databases/$(database)/documents/conversations/$(conversationId)).data.bookingId));
+           
+        allow create: if isAuthenticated() &&
+          (request.resource.data.senderId == request.auth.uid || request.resource.data.senderId == 'system') &&
+          isConversationParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data) &&
+          (get(/databases/$(database)/documents/conversations/$(conversationId)).data.bookingId == null ||
+           isPaidBooking(get(/databases/$(database)/documents/conversations/$(conversationId)).data.bookingId));
+           
+        allow update, delete: if false;
       }
     }
   }
 }
-

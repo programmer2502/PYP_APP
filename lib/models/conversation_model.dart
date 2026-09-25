@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ConversationModel {
   final String id;
+  final String? bookingId;
   final String customerId;
   final String photographerId;
   final String customerName;
@@ -15,6 +16,7 @@ class ConversationModel {
 
   const ConversationModel({
     required this.id,
+    this.bookingId,
     required this.customerId,
     required this.photographerId,
     this.customerName = '',
@@ -124,6 +126,7 @@ class ConversationModel {
 
     return ConversationModel(
       id: docId,
+      bookingId: map['bookingId'] as String?,
       customerId: customerId,
       photographerId: photographerId,
       customerName: map['customerName'] as String? ?? '',
@@ -144,6 +147,7 @@ class ConversationModel {
 
     return {
       'conversationId': id,
+      if (bookingId != null) 'bookingId': bookingId,
       'customerId': customerId,
       'photographerId': photographerId,
       'customerName': customerName,
@@ -161,6 +165,7 @@ class ConversationModel {
 
   ConversationModel copyWith({
     String? id,
+    String? bookingId,
     String? customerId,
     String? photographerId,
     String? customerName,
@@ -174,6 +179,7 @@ class ConversationModel {
   }) {
     return ConversationModel(
       id: id ?? this.id,
+      bookingId: bookingId ?? this.bookingId,
       customerId: customerId ?? this.customerId,
       photographerId: photographerId ?? this.photographerId,
       customerName: customerName ?? this.customerName,

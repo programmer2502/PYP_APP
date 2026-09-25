@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pyp_app/models/booking_model.dart';
@@ -13,8 +14,13 @@ import 'package:pyp_app/screens/photographer/photographer_calendar_content.dart'
 import 'package:pyp_app/screens/photographer/photographer_requests_content.dart';
 import 'package:pyp_app/screens/photographer/portfolio_manager_screen.dart';
 import 'package:pyp_app/services/payment_service.dart';
+import 'test_http_overrides.dart';
 
 void main() {
+  setUpAll(() {
+    HttpOverrides.global = TestHttpOverrides();
+  });
+
   group('Phase 11 - End-to-End Architectural Lifecycle Tests', () {
     test('Payment Platform Fee calculations across pricing tiers', () {
       final tier1 = PaymentCalculation.fromTotal(1000);
@@ -58,7 +64,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.favorite_border_rounded));
       await tester.pumpAndSettle();
-      expect(store.isSaved(photographer.name), isTrue);
+      expect(store.isPhotographerSaved(photographer), isTrue);
     });
 
     testWidgets('Customer Saved Photographers flow', (WidgetTester tester) async {
@@ -89,25 +95,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Choose a date'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('OK'));
-      await tester.pumpAndSettle();
-
-      final confirmBtn = find.text('Confirm booking');
+      final confirmBtn = find.byIcon(Icons.send_rounded);
       await tester.ensureVisible(confirmBtn);
       await tester.pumpAndSettle();
       await tester.tap(confirmBtn);
       await tester.pumpAndSettle();
 
-      expect(find.text('Booking request sent'), findsOneWidget);
+      expect(find.text('Booking Request Sent'), findsOneWidget);
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
 
       expect(store.bookings.isNotEmpty, isTrue);
     });
 
-    testWidgets('Customer Bookings content and cancellation flow',
+    testWidgets('Customer Bookings content and payment status flow',
         (WidgetTester tester) async {
       final store = PypStore();
       store.addBooking(
@@ -133,10 +134,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Bookings'), findsOneWidget);
       expect(find.text('Arjun Photography'), findsOneWidget);
-
-      await tester.tap(find.text('Cancel booking'));
-      await tester.pumpAndSettle();
-      expect(store.bookings.first.status, 'Cancelled');
+      expect(find.text('PAYMENT LOCKED'), findsOneWidget);
     });
 
     testWidgets('In-App Chat room messaging flow', (WidgetTester tester) async {

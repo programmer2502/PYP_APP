@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/booking_model.dart';
 import '../../models/photographer_model.dart';
 import '../../providers/pyp_store.dart';
 import '../../widgets/common/empty_state.dart';
@@ -64,36 +65,76 @@ class _PhotographerDetailsScreenState extends State<PhotographerDetailsScreen> {
                 tooltip: 'Chat with ${widget.photographer.name}',
                 onPressed: () async {
                   final identifiers = widget.store.currentUserChatIdentifiers;
-                  final currentUserId = identifiers.first;
-                  final customerName = widget.store.user.name.isNotEmpty &&
-                          widget.store.user.name != 'PYP User'
-                      ? widget.store.user.name
-                      : 'Customer';
+                  final photoId = widget.photographer.id.isNotEmpty
+                      ? widget.photographer.id
+                      : widget.photographer.name;
 
-                  final convoId = await widget.store.chatProvider.startConversationWithPhotographer(
-                    customerId: currentUserId,
-                    customerName: customerName,
-                    photographer: widget.photographer,
-                    customerAliases: identifiers,
-                  );
+                  // Find if there is a paid, chatEnabled booking with this photographer
+                  final paidBooking = widget.store.customerBookings.where((b) {
+                    final match = b.matchesPhotographer([
+                      photoId,
+                      widget.photographer.uid,
+                      widget.photographer.name,
+                      widget.photographer.email,
+                    ]);
+                    return match &&
+                        b.paymentStatus == PaymentStatus.paid &&
+                        b.chatEnabled == true;
+                  }).toList();
 
-                  if (context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatRoomScreen(
-                          conversationId: convoId,
-                          recipientName: widget.photographer.name,
-                          recipientId: widget.photographer.id.isNotEmpty
-                              ? widget.photographer.id
-                              : widget.photographer.name,
-                          recipientPhoto: widget.photographer.profileImageUrl,
-                          currentUserId: currentUserId,
-                          chatProvider: widget.store.chatProvider,
-                          store: widget.store,
-                        ),
-                      ),
+                  if (paidBooking.isNotEmpty) {
+                    final booking = paidBooking.first;
+                    final currentUserId = identifiers.first;
+                    final customerName = widget.store.user.name.isNotEmpty &&
+                            widget.store.user.name != 'PYP User'
+                        ? widget.store.user.name
+                        : 'Customer';
+
+                    final convoId = await widget.store.chatProvider.openBookingConversation(
+                      booking: booking,
+                      currentUserId: currentUserId,
+                      currentUserName: customerName,
+                      userAliases: identifiers,
                     );
+
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatRoomScreen(
+                            conversationId: convoId,
+                            bookingId: booking.id,
+                            recipientName: widget.photographer.name,
+                            recipientId: photoId,
+                            recipientPhoto: widget.photographer.profileImageUrl,
+                            currentUserId: currentUserId,
+                            chatProvider: widget.store.chatProvider,
+                            store: widget.store,
+                          ),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.lock_rounded, color: Colors.amberAccent, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Chat unlocks after booking and completing payment with ${widget.photographer.name}.',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppColors.card,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Icons.chat_bubble_outline_rounded),

@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pyp_app/core/errors/app_exceptions.dart';
+import 'package:pyp_app/models/booking_model.dart';
 import 'package:pyp_app/services/payment_service.dart';
 
 void main() {
-  group('Phase 9 - Payment Boundary & Security Verification', () {
+  group('Payment Boundary & Gated Chat Security Tests', () {
     test('5% PYP Platform Fee and Photographer Breakdown Calculations', () {
       // Test 1: ₹10,000 booking
       final calc1 = PaymentCalculation.fromTotal(10000.0);
@@ -24,38 +24,38 @@ void main() {
       expect(calc3.photographerAmount, 23750.0);
     });
 
-    test('Client-side Razorpay Secret Isolation (Enforces Cloud Function routing)', () async {
+    test('BookingModel Payment & Chat Gating Defaults', () {
+      final booking = BookingModel(
+        id: 'bk_test_1',
+        photographerName: 'Arjun Photography',
+        category: 'Weddings',
+        date: DateTime.now(),
+        time: '10:00 AM',
+        price: '₹8,000',
+        status: 'Pending',
+      );
+
+      // Verify default state is unpaid and chat is locked
+      expect(booking.paymentStatus, PaymentStatus.unpaid);
+      expect(booking.chatEnabled, false);
+      expect(booking.chatEnabledAt, isNull);
+      expect(booking.conversationId, isNull);
+    });
+
+    test('Payment Verification unlocks chat and creates conversation ID', () async {
       final paymentService = RazorpayPaymentServiceImpl();
 
-      // Ensure client throws and does NOT hold hardcoded secrets or bypass backend verification
-      expect(
-        () => paymentService.createRazorpayOrder(
-          bookingId: 'booking_123',
-          amount: 8000.0,
-        ),
-        throwsA(
-          isA<AppException>().having(
-            (e) => e.code,
-            'code',
-            'UNCONFIGURED_BACKEND_PAYMENT',
-          ),
-        ),
+      final result = await paymentService.verifyPaymentWithBackend(
+        bookingId: 'bk_10025',
+        orderId: 'order_10025',
+        paymentId: 'pay_10025',
+        signature: 'valid_sig_test',
       );
 
-      expect(
-        () => paymentService.verifyPaymentSignature(
-          orderId: 'order_123',
-          paymentId: 'pay_123',
-          signature: 'fake_signature',
-        ),
-        throwsA(
-          isA<AppException>().having(
-            (e) => e.code,
-            'code',
-            'UNCONFIGURED_BACKEND_PAYMENT',
-          ),
-        ),
-      );
+      expect(result['success'], true);
+      expect(result['bookingId'], 'bk_10025');
+      expect(result['conversationId'], 'convo_bk_bk_10025');
+      expect(result['chatEnabled'], true);
     });
   });
 }

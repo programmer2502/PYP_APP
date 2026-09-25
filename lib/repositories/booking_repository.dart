@@ -36,12 +36,34 @@ class BookingRepository {
     required PaymentStatus paymentStatus,
     String? paymentId,
     String? orderId,
+    bool? chatEnabled,
+    String? conversationId,
+    String? signature,
   }) {
     return _service.updateBookingPayment(
       bookingId: bookingId,
       paymentStatus: paymentStatus,
       paymentId: paymentId,
       orderId: orderId,
+      chatEnabled: chatEnabled,
+      conversationId: conversationId,
+      signature: signature,
+    );
+  }
+
+  Future<void> unlockBookingChat({
+    required String bookingId,
+    required String conversationId,
+    required String paymentId,
+    required String orderId,
+    String? signature,
+  }) {
+    return _service.unlockBookingChat(
+      bookingId: bookingId,
+      conversationId: conversationId,
+      paymentId: paymentId,
+      orderId: orderId,
+      signature: signature,
     );
   }
 }

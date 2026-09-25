@@ -1188,12 +1188,15 @@ class _BookingScreenState extends State<BookingScreen> {
                 children: [
                   const Icon(Icons.shield_outlined, size: 13, color: AppColors.textMuted),
                   const SizedBox(width: 6),
-                  Text(
-                    'Instant chat notification • Razorpay secure checkout upon acceptance',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textMuted.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w500,
+                  Flexible(
+                    child: Text(
+                      'Instant chat notification • Razorpay secure checkout upon acceptance',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

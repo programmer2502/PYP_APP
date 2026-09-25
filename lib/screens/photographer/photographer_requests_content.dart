@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/booking_model.dart';
 import '../../providers/pyp_store.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/photographer/photographer_request_card.dart';
-
 import '../chat/chat_room_screen.dart';
 
 class PhotographerRequests extends StatelessWidget {
@@ -37,7 +37,7 @@ class PhotographerRequests extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Manage customer booking requests.',
+                  'Manage customer booking requests & payments.',
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textTertiary,
@@ -51,53 +51,61 @@ class PhotographerRequests extends StatelessWidget {
                     subtitle: 'New customer booking requests will appear here.',
                   ),
                 ...requests.reversed.map(
-                  (booking) => PhotographerRequestCard(
-                    booking: booking,
-                    onAccept: booking.status == 'Pending'
-                        ? () {
-                            store.updateBookingStatus(booking, 'Accepted');
-                          }
-                        : null,
-                    onReject: booking.status == 'Pending'
-                        ? () {
-                            store.updateBookingStatus(booking, 'Rejected');
-                          }
-                        : null,
-                    onMessage: () {
-                      final identifiers = store.currentUserChatIdentifiers;
-                      final currentUserId = identifiers.first;
-                      final clientAlias = booking.customerId.isNotEmpty
-                          ? booking.customerId
-                          : (booking.customerEmail.isNotEmpty
-                              ? booking.customerEmail
-                              : 'customer');
-                      final photoId = booking.photographerId.isNotEmpty
-                          ? booking.photographerId
-                          : booking.photographerName;
+                  (booking) {
+                    final isPaid = booking.paymentStatus == PaymentStatus.paid;
+                    final isChatEnabled = isPaid && booking.chatEnabled;
 
-                      final safeCust = clientAlias.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-                      final safePhoto = photoId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-                      final convoId = 'convo_${safeCust}_$safePhoto';
+                    return PhotographerRequestCard(
+                      booking: booking,
+                      onAccept: booking.status == 'Pending'
+                          ? () {
+                              store.updateBookingStatus(booking, 'Accepted');
+                            }
+                          : null,
+                      onReject: booking.status == 'Pending'
+                          ? () {
+                              store.updateBookingStatus(booking, 'Rejected');
+                            }
+                          : null,
+                      onMessage: isChatEnabled
+                          ? () async {
+                              final identifiers = store.currentUserChatIdentifiers;
+                              final currentUserId = identifiers.first;
+                              final photoName = store.photographerAccount?.name ?? 'Photographer';
 
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatRoomScreen(
-                            conversationId: convoId,
-                            recipientName: booking.customerName.isNotEmpty
-                                ? booking.customerName
-                                : (booking.customerEmail.isNotEmpty
-                                    ? booking.customerEmail
-                                    : 'Client'),
-                            recipientId: clientAlias,
-                            currentUserId: currentUserId,
-                            chatProvider: store.chatProvider,
-                            store: store,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                              final convoId = await store.chatProvider.openBookingConversation(
+                                booking: booking,
+                                currentUserId: currentUserId,
+                                currentUserName: photoName,
+                                userAliases: identifiers,
+                              );
+
+                              if (context.mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatRoomScreen(
+                                      conversationId: convoId,
+                                      bookingId: booking.id,
+                                      recipientName: booking.customerName.isNotEmpty
+                                          ? booking.customerName
+                                          : (booking.customerEmail.isNotEmpty
+                                              ? booking.customerEmail
+                                              : 'Client'),
+                                      recipientId: booking.customerId.isNotEmpty
+                                          ? booking.customerId
+                                          : booking.customerEmail,
+                                      currentUserId: currentUserId,
+                                      chatProvider: store.chatProvider,
+                                      store: store,
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          : null,
+                    );
+                  },
                 ),
               ],
             ),
@@ -107,4 +115,3 @@ class PhotographerRequests extends StatelessWidget {
     );
   }
 }
-

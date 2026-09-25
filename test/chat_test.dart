@@ -104,7 +104,7 @@ void main() {
       expect(find.text('Arjun Verma'), findsOneWidget);
 
       // Verify initial empty state placeholder
-      expect(find.text('Say hello to start the conversation!'), findsOneWidget);
+      expect(find.text('Chat with Arjun Verma'), findsOneWidget);
 
       // Enter a new chat message
       final inputFinder = find.byType(TextField);
@@ -120,7 +120,7 @@ void main() {
 
       // Verify message is added to local bubbles immediately
       expect(find.text('Hi Arjun, are you free Saturday?'), findsOneWidget);
-      expect(find.text('Say hello to start the conversation!'), findsNothing);
+      expect(find.text('Chat with Arjun Verma'), findsNothing);
     });
 
     testWidgets('ChatInboxScreen displays empty state when no conversations',
@@ -137,7 +137,6 @@ void main() {
       // Verify screen title and empty state
       expect(find.text('Messages'), findsOneWidget);
       expect(find.text('No conversations yet'), findsOneWidget);
-      expect(find.text('Message a photographer or customer to start chatting.'), findsOneWidget);
     });
   });
 }

@@ -53,9 +53,14 @@ class ChatRepository {
     );
   }
 
+  Future<ConversationModel?> getConversationForBooking(String bookingId) {
+    return _service.getConversationForBooking(bookingId);
+  }
+
   Future<String> getOrCreateConversation({
     required String customerId,
     required String photographerId,
+    String? bookingId,
     String customerName = '',
     String photographerName = '',
     String? customerPhoto,
@@ -65,6 +70,7 @@ class ChatRepository {
     return _service.getOrCreateConversation(
       customerId: customerId,
       photographerId: photographerId,
+      bookingId: bookingId,
       customerName: customerName,
       photographerName: photographerName,
       customerPhoto: customerPhoto,

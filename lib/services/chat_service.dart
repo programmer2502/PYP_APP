@@ -146,18 +146,53 @@ class ChatService {
     }
   }
 
+  Future<ConversationModel?> getConversationForBooking(String bookingId) async {
+    if (!_firestoreService.isReady || bookingId.isEmpty) return null;
+
+    try {
+      final query = await _firestoreService
+          .collection(FirestoreCollections.conversations)
+          .where('bookingId', isEqualTo: bookingId)
+          .limit(1)
+          .get();
+
+      if (query.docs.isNotEmpty) {
+        return ConversationModel.fromMap(query.docs.first.data(), query.docs.first.id);
+      }
+
+      final safeId = 'convo_bk_${bookingId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}';
+      final doc = await _firestoreService
+          .collection(FirestoreCollections.conversations)
+          .doc(safeId)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        return ConversationModel.fromMap(doc.data()!, doc.id);
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
   Future<String> getOrCreateConversation({
     required String customerId,
     required String photographerId,
+    String? bookingId,
     String customerName = '',
     String photographerName = '',
     String? customerPhoto,
     String? photographerPhoto,
     List<String>? allParticipants,
   }) async {
-    final safeCust = customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-    final safePhoto = photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-    final deterministicId = 'convo_${safeCust}_$safePhoto';
+    final String deterministicId;
+    if (bookingId != null && bookingId.isNotEmpty) {
+      final safeBooking = bookingId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      deterministicId = 'convo_bk_$safeBooking';
+    } else {
+      final safeCust = customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      final safePhoto = photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      deterministicId = 'convo_${safeCust}_$safePhoto';
+    }
 
     if (!_firestoreService.isReady) {
       return deterministicId;
@@ -180,6 +215,7 @@ class ChatService {
       if (doc.exists) {
         await convoRef.set({
           'participants': FieldValue.arrayUnion(participantsList),
+          if (bookingId != null && bookingId.isNotEmpty) 'bookingId': bookingId,
           if (customerName.isNotEmpty) 'customerName': customerName,
           if (photographerName.isNotEmpty) 'photographerName': photographerName,
           'customerPhoto': ?customerPhoto,
@@ -191,6 +227,7 @@ class ChatService {
 
       final newConvo = ConversationModel(
         id: deterministicId,
+        bookingId: bookingId,
         customerId: customerId,
         photographerId: photographerId,
         customerName: customerName,

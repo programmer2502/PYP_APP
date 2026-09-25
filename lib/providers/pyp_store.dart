@@ -905,54 +905,7 @@ class PypStore extends ChangeNotifier {
       // Retained in-memory for offline/demo mode
     }
 
-    // 1. Auto-create chat message in shared thread
-    try {
-      final safeCust = booking.customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-      final safePhoto = booking.photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-      final convoId = 'convo_${safeCust}_$safePhoto';
-
-      final messageText = '📅 Booking Request Submitted\n'
-          '• Event: ${booking.category}\n'
-          '• Date: ${booking.date.day}/${booking.date.month}/${booking.date.year}\n'
-          '• Time: ${booking.time}${booking.endTime != null && booking.endTime!.isNotEmpty ? ' - ${booking.endTime}' : ''} (${booking.duration})\n'
-          '• Total Amount: ${booking.price}'
-          '${booking.notes.isNotEmpty ? '\n• Notes: ${booking.notes}' : ''}\n\n'
-          'Status: Pending photographer confirmation.';
-
-      final allParticipants = <String>{
-        booking.customerId,
-        booking.customerEmail,
-        booking.customerName,
-        booking.customerPhone,
-        ...booking.customerIdentifiers,
-        booking.photographerId,
-        booking.photographerUid,
-        booking.photographerName,
-        booking.photographerEmail,
-        ...booking.photographerIdentifiers,
-        ...currentUserChatIdentifiers,
-      }..removeWhere((s) => s.isEmpty || s == 'guest_user' || s == 'user@example.com' || s == 'pyp user');
-
-      chatProvider.sendMessage(
-        conversationId: convoId,
-        message: messageText,
-        senderId: booking.customerId.isNotEmpty
-            ? booking.customerId
-            : (user.email.isNotEmpty ? user.email : user.uid),
-        senderName: booking.customerName.isNotEmpty
-            ? booking.customerName
-            : (user.name.isNotEmpty && user.name != 'PYP User' ? user.name : 'Client'),
-        recipientId: booking.photographerId,
-        recipientName: booking.photographerName,
-        customerId: booking.customerId,
-        customerName: booking.customerName,
-        photographerId: booking.photographerId,
-        photographerName: booking.photographerName,
-        additionalParticipants: allParticipants.toList(),
-      ).catchError((_) {});
-    } catch (_) {}
-
-    // 2. Queue in-app notification for photographer & customer
+    // Queue in-app notification for photographer & customer (No chat created until paid)
     try {
       final clientLabel = booking.customerName.isNotEmpty
           ? booking.customerName
@@ -999,13 +952,8 @@ class PypStore extends ChangeNotifier {
       }
     }
 
-    // 1. Auto-send chat message on status update
+    // Notifications for status update (Chat remains gated on payment)
     try {
-      final safeCust = booking.customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-      final safePhoto = booking.photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-      final convoId = 'convo_${safeCust}_$safePhoto';
-
-      String chatText = '';
       String notifTitle = '';
       String notifBody = '';
       AppNotificationType notifType = AppNotificationType.system;
@@ -1016,60 +964,20 @@ class PypStore extends ChangeNotifier {
       final isCancelled = status.toLowerCase() == 'cancelled';
 
       if (isAccepted) {
-        chatText = '🎉 Booking Accepted!\n'
-            'Your ${booking.category} session on ${booking.date.day}/${booking.date.month}/${booking.date.year} at ${booking.time} (${booking.duration}) is now CONFIRMED. Looking forward to our session!';
         notifTitle = 'Booking Confirmed! 🎉';
-        notifBody = '${booking.photographerName} has accepted your booking for ${booking.category}.';
+        notifBody = '${booking.photographerName} has accepted your booking for ${booking.category}. Please complete payment to unlock chat.';
         notifType = AppNotificationType.bookingAccepted;
         notifRecipient = booking.customerId;
       } else if (isRejected) {
-        chatText = '❌ Booking Declined\n'
-            'The photographer is unavailable for this time slot on ${booking.date.day}/${booking.date.month}/${booking.date.year}.';
         notifTitle = 'Booking Request Declined';
         notifBody = '${booking.photographerName} was unable to accept your request for ${booking.date.day}/${booking.date.month}/${booking.date.year}.';
         notifType = AppNotificationType.bookingRejected;
         notifRecipient = booking.customerId;
       } else if (isCancelled) {
-        chatText = '🚫 Booking Cancelled\n'
-            'The booking for ${booking.category} on ${booking.date.day}/${booking.date.month}/${booking.date.year} was cancelled.';
         notifTitle = 'Booking Cancelled';
         notifBody = 'The booking on ${booking.date.day}/${booking.date.month}/${booking.date.year} has been cancelled.';
         notifType = AppNotificationType.bookingCancelled;
         notifRecipient = booking.photographerId;
-      }
-
-      final allParticipants = <String>{
-        booking.customerId,
-        booking.customerEmail,
-        booking.customerName,
-        booking.customerPhone,
-        ...booking.customerIdentifiers,
-        booking.photographerId,
-        booking.photographerUid,
-        booking.photographerName,
-        booking.photographerEmail,
-        ...booking.photographerIdentifiers,
-        ...currentUserChatIdentifiers,
-      }..removeWhere((s) => s.isEmpty || s == 'guest_user' || s == 'user@example.com' || s == 'pyp user');
-
-      if (chatText.isNotEmpty) {
-        chatProvider.sendMessage(
-          conversationId: convoId,
-          message: chatText,
-          senderId: currentUserChatIdentifiers.first,
-          senderName: user.name.isNotEmpty && user.name != 'PYP User'
-              ? user.name
-              : (photographerAccount?.name ?? 'PYP'),
-          recipientId: notifRecipient,
-          recipientName: notifRecipient == booking.customerId
-              ? (booking.customerName.isNotEmpty ? booking.customerName : 'Client')
-              : booking.photographerName,
-          customerId: booking.customerId,
-          customerName: booking.customerName,
-          photographerId: booking.photographerId,
-          photographerName: booking.photographerName,
-          additionalParticipants: allParticipants.toList(),
-        ).catchError((_) {});
       }
 
       if (notifTitle.isNotEmpty) {
@@ -1089,13 +997,25 @@ class PypStore extends ChangeNotifier {
     required PaymentStatus paymentStatus,
     String? paymentId,
     String? orderId,
+    bool? chatEnabled,
+    String? conversationId,
+    String? signature,
   }) async {
+    final isPaid = paymentStatus == PaymentStatus.paid;
+    final enabled = chatEnabled ?? isPaid;
+    final convoId = conversationId ??
+        (isPaid ? 'convo_bk_${booking.id.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}' : null);
+
     final idx = bookings.indexWhere((b) => (b.id.isNotEmpty && b.id == booking.id) || b == booking);
     if (idx != -1) {
       bookings[idx] = bookings[idx].copyWith(
         paymentStatus: paymentStatus,
+        chatEnabled: enabled,
+        chatEnabledAt: isPaid ? DateTime.now() : null,
+        conversationId: convoId,
         razorpayPaymentId: paymentId,
         razorpayOrderId: orderId,
+        razorpaySignature: signature,
       );
     }
     notifyListeners();
@@ -1107,25 +1027,18 @@ class PypStore extends ChangeNotifier {
           paymentStatus: paymentStatus,
           paymentId: paymentId,
           orderId: orderId,
+          chatEnabled: enabled,
+          conversationId: convoId,
+          signature: signature,
         );
       } catch (_) {
         // Retained locally in offline mode
       }
     }
 
-    // Auto-send payment confirmation chat message & notification
-    if (paymentStatus == PaymentStatus.paid) {
+    // Auto-activate verified chat thread & notification once paid
+    if (isPaid && convoId != null) {
       try {
-        final safeCust = booking.customerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-        final safePhoto = booking.photographerId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
-        final convoId = 'convo_${safeCust}_$safePhoto';
-
-        final payMsg = '💳 Payment Received\n'
-            '• Amount: ${booking.price}\n'
-            '• Payment ID: ${paymentId ?? 'N/A'}\n'
-            '• Gateway: Razorpay (Cards / UPI / NetBanking)\n'
-            '• Status: Paid in Full';
-
         final allParticipants = <String>{
           booking.customerId,
           booking.customerEmail,
@@ -1140,15 +1053,18 @@ class PypStore extends ChangeNotifier {
           ...currentUserChatIdentifiers,
         }..removeWhere((s) => s.isEmpty || s == 'guest_user' || s == 'user@example.com' || s == 'pyp user');
 
+        final payMsg = '💳 Payment Verified & Received\n'
+            '• Amount: ${booking.price}\n'
+            '• Payment ID: ${paymentId ?? 'N/A'}\n'
+            '• Gateway: Razorpay Verified\n'
+            '• Status: Paid in Full\n\n'
+            'Chat is now active for this booking.';
+
         chatProvider.sendMessage(
           conversationId: convoId,
           message: payMsg,
-          senderId: booking.customerId.isNotEmpty
-              ? booking.customerId
-              : (user.email.isNotEmpty ? user.email : user.uid),
-          senderName: booking.customerName.isNotEmpty && booking.customerName != 'PYP User'
-              ? booking.customerName
-              : (user.name.isNotEmpty && user.name != 'PYP User' ? user.name : 'Client'),
+          senderId: 'system',
+          senderName: 'PYP Concierge',
           recipientId: booking.photographerId,
           recipientName: booking.photographerName,
           customerId: booking.customerId,
@@ -1156,12 +1072,13 @@ class PypStore extends ChangeNotifier {
           photographerId: booking.photographerId,
           photographerName: booking.photographerName,
           additionalParticipants: allParticipants.toList(),
+          type: 'system',
         ).catchError((_) {});
 
         _notificationService.sendNotification(
           recipientUserId: booking.photographerId,
           title: 'Payment Received! 💳',
-          message: '${booking.customerName.isNotEmpty ? booking.customerName : 'Client'} completed payment of ${booking.price} via Razorpay.',
+          message: '${booking.customerName.isNotEmpty ? booking.customerName : 'Client'} completed payment of ${booking.price}. Chat is unlocked.',
           type: AppNotificationType.bookingAccepted,
           referenceId: booking.id,
         ).catchError((_) => null);
