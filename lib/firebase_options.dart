@@ -35,7 +35,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCq_UibliO1Q_5Bp9vFzxZqcAv2bAJ-kro',
-    appId: '1:951546987988:android:52298f504df561a81f8241',
+    appId: '1:951546987988:android:3083048a153671be1f8241',
     messagingSenderId: '951546987988',
     projectId: 'pyp-app-fc631',
     storageBucket: 'pyp-app-fc631.firebasestorage.app',
@@ -48,6 +48,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: 'REPLACE_WITH_YOUR_MESSAGING_SENDER_ID',
     projectId: 'REPLACE_WITH_YOUR_PROJECT_ID',
     storageBucket: 'REPLACE_WITH_YOUR_STORAGE_BUCKET',
-    iosBundleId: 'com.example.pypApp',
+    iosBundleId: 'com.pyp.app',
   );
 }
